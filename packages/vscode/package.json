@@ -1,0 +1,72 @@
+{
+  "name": "@aide/vscode",
+  "version": "0.1.0",
+  "description": "VS Code extension for Aide - AI Mod Manager",
+  "displayName": "Aide - AI Mod Manager",
+  "publisher": "aide",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "workspaceContains:.aide",
+    "onCommand:aide.apply",
+    "onCommand:aide.listMods",
+    "onCommand:aide.addMod",
+    "onCommand:aide.sync"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "aide.apply",
+        "title": "Aide: Apply Template to Workspace"
+      },
+      {
+        "command": "aide.listMods",
+        "title": "Aide: List Mods"
+      },
+      {
+        "command": "aide.addMod",
+        "title": "Aide: Add Mod from File"
+      },
+      {
+        "command": "aide.sync",
+        "title": "Aide: Sync Templates to Linked Projects"
+      },
+      {
+        "command": "aide.linkWorkspace",
+        "title": "Aide: Link Workspace"
+      },
+      {
+        "command": "aide.unlinkWorkspace",
+        "title": "Aide: Unlink Workspace"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "aideModsView",
+          "name": "Aide Mods"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "@aide/core": "*",
+    "chokidar": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.8.0"
+  }
+}

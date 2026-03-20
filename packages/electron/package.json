@@ -1,0 +1,35 @@
+{
+  "name": "@aide/electron",
+  "version": "0.1.0",
+  "description": "Electron app for Aide - AI Mod Manager",
+  "private": true,
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch & electron .",
+    "typecheck": "tsc --noEmit",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "@aide/core": "*",
+    "electron": "^34.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron-builder": "^25.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.8.0"
+  },
+  "build": {
+    "appId": "dev.aide.app",
+    "productName": "Aide",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "src/renderer/**/*",
+      "package.json"
+    ]
+  }
+}
