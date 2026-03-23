@@ -1,12 +1,12 @@
 .claude/
 # Dependencies
 node_modules/
-package-lock.json
 yarn.lock
 
 # Build outputs
 dist/
 build/
+packages/electron/release/
 *.tsbuildinfo
 
 # Logs
