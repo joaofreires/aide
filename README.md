@@ -1,6 +1,6 @@
-# Aide — AI Mod Manager
+# Aide - AI Mod Manager
 
-Centralized manager for AI context mods. Install, sync, and inject AI personas (Agents), capabilities (Skills), and project documentation (`CLAUDE.md`, `AGENTS.md`) across all your development environments from a single source of truth at `~/.aide/`.
+My personal centralized manager for AI skills. Install, sync, and inject Skills, across development environments.
 
 ## Interfaces
 
