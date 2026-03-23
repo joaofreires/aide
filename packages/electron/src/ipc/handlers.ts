@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, dialog, BrowserWindow } from 'electron'
 import {
   init,
   add,
@@ -11,8 +11,17 @@ import {
   propagate,
   readRegistry,
   readConfig,
+  updateConfig,
   discover,
+  listProjectSkills,
+  disableProjectSkill,
+  enableProjectSkill,
+  importProjectSkill,
+  copyProjectSkillToRels,
+  readSkillFrontmatter,
+  isAideDirInitialized,
 } from '@aide/core'
+import type { GlobalConfig } from '@aide/core'
 import { IPC } from './channels.js'
 import type { AddOptions, ApplyOptions, ListOptions, LinkOptions } from '@aide/core'
 
@@ -50,7 +59,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(IPC.SYNC, async (_event, templateName?: string) => {
-    return propagate({ templateName })
+    return propagate(templateName !== undefined ? { templateName } : {})
   })
 
   ipcMain.handle(IPC.READ_REGISTRY, async () => {
@@ -61,7 +70,47 @@ export function registerIpcHandlers(): void {
     return readConfig()
   })
 
+  ipcMain.handle(IPC.UPDATE_CONFIG, async (_event, updates: Partial<Omit<GlobalConfig, 'version'>>) => {
+    return updateConfig(updates)
+  })
+
   ipcMain.handle(IPC.DISCOVER, async () => {
     return discover()
+  })
+
+  ipcMain.handle(IPC.PICK_FOLDER, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const result = await dialog.showOpenDialog(win ?? BrowserWindow.getFocusedWindow()!, {
+      properties: ['openDirectory'],
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle(IPC.LIST_PROJECT_SKILLS, async (_event, projectPath: string) => {
+    return listProjectSkills(projectPath)
+  })
+
+  ipcMain.handle(IPC.DISABLE_PROJECT_SKILL, async (_event, projectPath: string, skillId: string) => {
+    return disableProjectSkill(projectPath, skillId)
+  })
+
+  ipcMain.handle(IPC.ENABLE_PROJECT_SKILL, async (_event, projectPath: string, skillId: string, targetRels?: string[]) => {
+    return enableProjectSkill(projectPath, skillId, undefined, targetRels)
+  })
+
+  ipcMain.handle(IPC.IMPORT_PROJECT_SKILL, async (_event, projectPath: string, skillId: string) => {
+    return importProjectSkill(projectPath, skillId)
+  })
+
+  ipcMain.handle(IPC.COPY_PROJECT_SKILL, async (_event, projectPath: string, skillId: string, targetRels?: string[]) => {
+    return copyProjectSkillToRels(projectPath, skillId, targetRels)
+  })
+
+  ipcMain.handle(IPC.READ_SKILL_FRONTMATTER, async (_event, filePath: string) => {
+    return readSkillFrontmatter(filePath)
+  })
+
+  ipcMain.handle(IPC.IS_INITIALIZED, async () => {
+    return isAideDirInitialized()
   })
 }

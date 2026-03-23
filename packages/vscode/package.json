@@ -24,15 +24,15 @@
       },
       {
         "command": "aide.listMods",
-        "title": "Aide: List Mods"
+        "title": "Aide: List Skills"
       },
       {
         "command": "aide.addMod",
-        "title": "Aide: Add Mod from File"
+        "title": "Aide: Add Skill from File"
       },
       {
         "command": "aide.sync",
-        "title": "Aide: Sync Templates to Linked Projects"
+        "title": "Aide: Sync Skills to Linked Projects"
       },
       {
         "command": "aide.linkWorkspace",
@@ -46,8 +46,8 @@
     "views": {
       "explorer": [
         {
-          "id": "aideModsView",
-          "name": "Aide Mods"
+          "id": "aideSkillsView",
+          "name": "Aide Skills"
         }
       ]
     }

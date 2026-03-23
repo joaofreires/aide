@@ -16,7 +16,15 @@ import type {
   Registry,
   GlobalConfig,
   DiscoverResult,
+  ProjectSkillsResult,
+  DisableProjectSkillResult,
+  EnableProjectSkillResult,
+  ImportProjectSkillResult,
+  CopyProjectSkillResult,
+  SkillFrontmatter,
 } from '@aide/core'
+
+type ConfigUpdates = Partial<Omit<GlobalConfig, 'version'>>
 
 /** Safe API exposed to the renderer via contextBridge */
 const aideAPI = {
@@ -41,7 +49,33 @@ const aideAPI = {
 
   readConfig: (): Promise<GlobalConfig> => ipcRenderer.invoke(IPC.READ_CONFIG),
 
+  updateConfig: (updates: ConfigUpdates): Promise<GlobalConfig> =>
+    ipcRenderer.invoke(IPC.UPDATE_CONFIG, updates),
+
   discover: (): Promise<DiscoverResult> => ipcRenderer.invoke(IPC.DISCOVER),
+
+  pickFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.PICK_FOLDER),
+
+  listProjectSkills: (projectPath: string): Promise<ProjectSkillsResult> =>
+    ipcRenderer.invoke(IPC.LIST_PROJECT_SKILLS, projectPath),
+
+  disableProjectSkill: (projectPath: string, skillId: string): Promise<DisableProjectSkillResult> =>
+    ipcRenderer.invoke(IPC.DISABLE_PROJECT_SKILL, projectPath, skillId),
+
+  enableProjectSkill: (projectPath: string, skillId: string, targetRels?: string[]): Promise<EnableProjectSkillResult> =>
+    ipcRenderer.invoke(IPC.ENABLE_PROJECT_SKILL, projectPath, skillId, targetRels),
+
+  importProjectSkill: (projectPath: string, skillId: string): Promise<ImportProjectSkillResult> =>
+    ipcRenderer.invoke(IPC.IMPORT_PROJECT_SKILL, projectPath, skillId),
+
+  copyProjectSkill: (projectPath: string, skillId: string, targetRels?: string[]): Promise<CopyProjectSkillResult> =>
+    ipcRenderer.invoke(IPC.COPY_PROJECT_SKILL, projectPath, skillId, targetRels),
+
+  readSkillFrontmatter: (filePath: string): Promise<SkillFrontmatter | null> =>
+    ipcRenderer.invoke(IPC.READ_SKILL_FRONTMATTER, filePath),
+
+  isInitialized: (): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.IS_INITIALIZED),
 }
 
 contextBridge.exposeInMainWorld('aide', aideAPI)

@@ -1,5 +1,5 @@
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, basename } from 'node:path'
 import { mkdir, access, constants } from 'node:fs/promises'
 
 export interface AidePaths {
@@ -38,6 +38,27 @@ export async function ensureAideDir(homeOverride?: string): Promise<AidePaths> {
   await mkdir(paths.agents, { recursive: true })
   await mkdir(paths.skills, { recursive: true })
   await mkdir(paths.templates, { recursive: true })
+  return paths
+}
+
+export interface ProjectArchivePaths {
+  projectDir: string   // ~/.aide/projects/{name}
+  skillsDir: string    // ~/.aide/projects/{name}/skills
+}
+
+export function getProjectArchivePaths(projectPath: string, homeOverride?: string): ProjectArchivePaths {
+  const home = homeOverride ?? homedir()
+  const projectName = basename(projectPath)
+  const projectDir = join(home, '.aide', 'projects', projectName)
+  return { projectDir, skillsDir: join(projectDir, 'skills') }
+}
+
+export async function ensureProjectArchiveDir(
+  projectPath: string,
+  homeOverride?: string,
+): Promise<ProjectArchivePaths> {
+  const paths = getProjectArchivePaths(projectPath, homeOverride)
+  await mkdir(paths.skillsDir, { recursive: true })
   return paths
 }
 

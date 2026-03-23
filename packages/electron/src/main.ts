@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 import { join } from 'node:path'
 import { registerIpcHandlers } from './ipc/handlers.js'
 
@@ -16,15 +16,17 @@ function createWindow(): BrowserWindow {
     },
   })
 
-  // In dev, load from file; in production from bundled HTML
-  const indexPath = join(__dirname, '..', 'src', 'renderer', 'index.html')
+  const indexPath = join(__dirname, 'renderer', 'index.html')
   void win.loadFile(indexPath)
-  win.webContents.once('did-finish-load', () => win.webContents.openDevTools())
+  if (process.env['AIDE_DEVTOOLS']) {
+    win.webContents.once('did-finish-load', () => win.webContents.openDevTools())
+  }
 
   return win
 }
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null)
   registerIpcHandlers()
   createWindow()
 

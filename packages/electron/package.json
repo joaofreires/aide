@@ -6,16 +6,20 @@
   "main": "./dist/main.js",
   "scripts": {
     "build": "tsup",
-    "dev": "tsup --watch & electron .",
+    "dev": "npm run build && (tsup --watch & electron .)",
     "typecheck": "tsc --noEmit",
     "dist": "electron-builder"
   },
   "dependencies": {
     "@aide/core": "*",
-    "electron": "^34.0.0"
+    "electron": "^34.0.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
     "electron-builder": "^25.0.0",
     "tsup": "^8.5.1",
     "typescript": "^5.8.0"
@@ -28,7 +32,6 @@
     },
     "files": [
       "dist/**/*",
-      "src/renderer/**/*",
       "package.json"
     ]
   }

@@ -4,6 +4,8 @@ import { join, basename, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { getAidePaths } from '../fs/aideDir.js'
 import { readRegistry } from '../registry/registry.js'
+import { readConfig } from '../config/config.js'
+import type { GlobalConfig } from '../config/schema.js'
 import type { ModType } from '../registry/schema.js'
 
 export type DiscoveredFile = {
@@ -18,63 +20,12 @@ export type DiscoverResult = {
   scanned_dirs: string[]
 }
 
-/** Filenames that are always templates regardless of location */
-const TEMPLATE_NAMES = new Set(['CLAUDE.md', 'AGENTS.md', '.cursorrules', 'copilot-instructions.md'])
-
-/**
- * Known typed directories: every file inside is that type.
- * rel is relative to home (~/).
- */
-const TYPED_DIRS: Array<{ rel: string; type: ModType }> = [
-  // Skills
-  { rel: '.codex/skills',    type: 'skill' },
-  { rel: '.claude/skills',   type: 'skill' },
-  { rel: '.opencode/skills', type: 'skill' },
-  { rel: '.cursor/tools',    type: 'skill' },
-  { rel: '.aider/scripts',   type: 'skill' },
-  { rel: '.continue/tools',  type: 'skill' },
-
-  // Agents / personas
-  { rel: '.codex/agents',    type: 'agent' },
-  { rel: '.claude/agents',   type: 'agent' },
-  { rel: '.opencode/agents', type: 'agent' },
-  { rel: '.cursor/rules',    type: 'agent' },
-  { rel: '.aider/prompts',   type: 'agent' },
-  { rel: '.continue/prompts',type: 'agent' },
-]
-
-/**
- * Roots to scan for template files by name (CLAUDE.md, AGENTS.md, etc.).
- * Hidden AI tool dirs are included so we catch e.g. ~/.github/copilot-instructions.md.
- */
-const TEMPLATE_SCAN_ROOTS: Array<{ rel: string; depth: number }> = [
-  { rel: '.',        depth: 0 },
-  { rel: '.github',  depth: 1 },
-  { rel: '.claude',  depth: 1 },
-  { rel: '.cursor',  depth: 1 },
-  { rel: '.codex',   depth: 1 },
-  { rel: '.opencode',depth: 1 },
-  { rel: 'Projects', depth: 3 },
-  { rel: 'projects', depth: 3 },
-  { rel: 'dev',      depth: 3 },
-  { rel: 'code',     depth: 3 },
-  { rel: 'workspace',depth: 3 },
-  { rel: 'Documents',depth: 2 },
-  { rel: 'src',      depth: 3 },
-]
-
-const SKIP_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', '.next', '.cache',
-  '__pycache__', 'vendor', '.npm', '.yarn', '.pnpm',
-  'target', 'out', '.svelte-kit', 'coverage', 'tmp',
-])
-
 /**
  * List skill/agent entries from a typed directory.
  * - Subdirectories containing SKILL.md → returns SKILL.md path (Agent Skills standard)
  * - Direct files → returned as-is (legacy script/command format)
  */
-async function listTypedEntries(dir: string): Promise<string[]> {
+export async function listTypedEntries(dir: string): Promise<string[]> {
   if (!existsSync(dir)) return []
   try {
     const entries = await readdir(dir)
@@ -99,36 +50,43 @@ async function listTypedEntries(dir: string): Promise<string[]> {
   }
 }
 
-/** Scan for files matching TEMPLATE_NAMES, skipping noise dirs. */
+/** Scan for files matching templateNames, skipping noise dirs. */
 async function scanForTemplates(
   dir: string,
   currentDepth: number,
   maxDepth: number,
   out: string[],
+  templateNames: Set<string>,
+  skipDirs: Set<string>,
 ): Promise<void> {
   if (currentDepth > maxDepth || !existsSync(dir)) return
   let entries: string[]
   try { entries = await readdir(dir) } catch { return }
 
   for (const entry of entries) {
-    if (SKIP_DIRS.has(entry)) continue
+    if (skipDirs.has(entry)) continue
     const full = join(dir, entry)
     try {
       const s = await stat(full)
-      if (s.isFile() && TEMPLATE_NAMES.has(entry)) {
+      if (s.isFile() && templateNames.has(entry)) {
         out.push(full)
       } else if (s.isDirectory() && currentDepth < maxDepth) {
-        await scanForTemplates(full, currentDepth + 1, maxDepth, out)
+        await scanForTemplates(full, currentDepth + 1, maxDepth, out, templateNames, skipDirs)
       }
     } catch { /* skip */ }
   }
 }
 
-export async function discover(homeOverride?: string): Promise<DiscoverResult> {
+export async function discover(homeOverride?: string, configOverride?: GlobalConfig): Promise<DiscoverResult> {
   const home = homeOverride ?? homedir()
   const paths = getAidePaths(homeOverride)
   const registry = await readRegistry(homeOverride)
+  const config = configOverride ?? await readConfig(homeOverride)
   const importedPaths = new Set(Object.values(registry.mods).map(m => m.path))
+
+  const typedDirs = [...config.skill_dirs, ...config.agent_dirs]
+  const templateNames = new Set(config.template_names)
+  const skipDirs = new Set(config.skip_dirs)
 
   const seen = new Set<string>()
   const found: DiscoveredFile[] = []
@@ -150,23 +108,23 @@ export async function discover(homeOverride?: string): Promise<DiscoverResult> {
   }
 
   // 1. Typed directories — every file inside is that type
-  for (const { rel, type } of TYPED_DIRS) {
+  for (const { rel, type } of typedDirs) {
     const dir = join(home, rel)
     if (dir === paths.root || dir.startsWith(paths.root + '/')) continue
     if (!existsSync(dir)) continue
     scannedDirs.push(dir)
     const files = await listTypedEntries(dir)
-    for (const f of files) addFile(f, type)
+    for (const f of files) addFile(f, type as ModType)
   }
 
-  // 2. Template name scan across common project roots
+  // 2. Template name scan across configured project roots
   const templateFiles: string[] = []
-  for (const { rel, depth } of TEMPLATE_SCAN_ROOTS) {
+  for (const { rel, depth } of config.template_scan_roots) {
     const dir = rel === '.' ? home : join(home, rel)
     if (dir === paths.root || dir.startsWith(paths.root + '/')) continue
     if (!existsSync(dir)) continue
     if (!scannedDirs.includes(dir)) scannedDirs.push(dir)
-    await scanForTemplates(dir, 0, depth, templateFiles)
+    await scanForTemplates(dir, 0, depth, templateFiles, templateNames, skipDirs)
   }
   for (const f of templateFiles) addFile(f, 'template')
 

@@ -2,14 +2,14 @@
 export * from './errors/AideError.js'
 
 // FS utilities
-export { getAidePaths, ensureAideDir, isAideDirInitialized } from './fs/aideDir.js'
+export { getAidePaths, ensureAideDir, isAideDirInitialized, getProjectArchivePaths, ensureProjectArchiveDir } from './fs/aideDir.js'
 export { assertExecutable, isReadable, isWritable } from './fs/permissions.js'
-export type { AidePaths } from './fs/aideDir.js'
+export type { AidePaths, ProjectArchivePaths } from './fs/aideDir.js'
 
 // Config
 export { readConfig, writeConfig, updateConfig } from './config/config.js'
 export { GlobalConfigSchema, DEFAULT_CONFIG } from './config/schema.js'
-export type { GlobalConfig } from './config/schema.js'
+export type { GlobalConfig, TypedDir, ScanRoot } from './config/schema.js'
 
 // Registry
 export {
@@ -57,13 +57,27 @@ export { apply, writeApplyResult } from './operations/apply.js'
 export { add } from './operations/add.js'
 export { remove } from './operations/remove.js'
 export { list } from './operations/list.js'
-export { discover } from './operations/discover.js'
+export { discover, listTypedEntries } from './operations/discover.js'
+export { listProjectSkills } from './operations/listProjectSkills.js'
+export { disableProjectSkill } from './operations/disableProjectSkill.js'
+export { enableProjectSkill } from './operations/enableProjectSkill.js'
+export { importProjectSkill } from './operations/importProjectSkill.js'
+export { copyProjectSkillToRels } from './operations/copyProjectSkillToRels.js'
+export { readSkillFrontmatter } from './operations/readSkillFrontmatter.js'
 export type { InitResult } from './operations/init.js'
 export type { ApplyOptions, ApplyResult } from './operations/apply.js'
 export type { AddOptions, AddResult } from './operations/add.js'
 export type { RemoveOptions, RemoveResult } from './operations/remove.js'
 export type { ListOptions, ListResult } from './operations/list.js'
 export type { DiscoverResult, DiscoveredFile } from './operations/discover.js'
+export type {
+  ProjectSkillStatus, ProjectSkill, ProjectSkillsResult, ArchivedSkillMeta,
+} from './operations/listProjectSkills.js'
+export type { SkillFrontmatter } from './skills/frontmatter.js'
+export type { DisableProjectSkillResult } from './operations/disableProjectSkill.js'
+export type { EnableProjectSkillResult } from './operations/enableProjectSkill.js'
+export type { ImportProjectSkillResult } from './operations/importProjectSkill.js'
+export type { CopyProjectSkillResult } from './operations/copyProjectSkillToRels.js'
 
 // Linking
 export { link, unlink } from './linking/linker.js'

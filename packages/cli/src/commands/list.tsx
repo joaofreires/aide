@@ -26,7 +26,7 @@ export function ListCommand({ projectPath }: ListCommandProps) {
   return (
     <Box flexDirection="column" gap={1}>
       <Box flexDirection="column">
-        <Text bold>Global Mods</Text>
+        <Text bold>Global Skills</Text>
         <ModsTable mods={result.global_mods} />
       </Box>
 
