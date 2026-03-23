@@ -1,8 +1,41 @@
 import { useState } from 'react'
-import type { DiscoveredFile } from '@aide/core'
+import type { DiscoveredFile, RemoteSkill } from '@aide/core'
 import { useToast } from '../hooks/useToast.js'
+import { SkillDetail } from './shared/SkillDetail.js'
+
+type Tab = 'local' | 'repositories'
 
 export function DiscoverPage() {
+  const [tab, setTab] = useState<Tab>('local')
+
+  return (
+    <div className="page active" style={{ display: 'flex' }}>
+      <div className="page-header">
+        <div className="page-title">Discover</div>
+        <div className="page-desc">Find and install AI skills from your filesystem or GitHub repositories</div>
+      </div>
+      <div className="page-content">
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '16px' }}>
+          <button
+            className={`btn btn-sm${tab === 'local' ? ' btn-primary' : ' btn-secondary'}`}
+            onClick={() => setTab('local')}
+          >
+            Local
+          </button>
+          <button
+            className={`btn btn-sm${tab === 'repositories' ? ' btn-primary' : ' btn-secondary'}`}
+            onClick={() => setTab('repositories')}
+          >
+            Repositories
+          </button>
+        </div>
+        {tab === 'local' ? <LocalTab /> : <RepositoriesTab />}
+      </div>
+    </div>
+  )
+}
+
+function LocalTab() {
   const { toast } = useToast()
   const [scanResults, setScanResults] = useState<DiscoveredFile[]>([])
   const [checked, setChecked] = useState<Set<number>>(new Set())
@@ -99,43 +132,173 @@ export function DiscoverPage() {
   }
 
   return (
-    <div className="page active" style={{ display: 'flex' }}>
-      <div className="page-header">
-        <div className="page-title">Discover</div>
-        <div className="page-desc">Find AI context files on your system and import them into your library</div>
-      </div>
-      <div className="page-content">
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Scan Results</span>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                className="btn btn-secondary btn-sm"
-                disabled={!anyChecked || importing}
-                onClick={() => { void handleImportSelected() }}
-              >
-                {importing ? 'Importing...' : 'Import Selected'}
-              </button>
-              <button
-                className="btn btn-primary btn-sm"
-                disabled={scanning}
-                onClick={() => { void handleScan() }}
-              >
-                {scanning ? 'Scanning...' : 'Scan ~/ Now'}
-              </button>
-            </div>
-          </div>
-          <div className="list-body">
-            {renderList()}
+    <>
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Scan Results</span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={!anyChecked || importing}
+              onClick={() => { void handleImportSelected() }}
+            >
+              {importing ? 'Importing...' : 'Import Selected'}
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              disabled={scanning}
+              onClick={() => { void handleScan() }}
+            >
+              {scanning ? 'Scanning...' : 'Scan ~/ Now'}
+            </button>
           </div>
         </div>
-        {error && (
-          <div className="feedback show-error">{error}</div>
-        )}
-        {scanned && !scanning && newCount === 0 && scanResults.length > 0 && (
-          <div className="feedback show-info">All discovered files have already been imported.</div>
-        )}
+        <div className="list-body">
+          {renderList()}
+        </div>
       </div>
-    </div>
+      {error && (
+        <div className="feedback show-error">{error}</div>
+      )}
+      {scanned && !scanning && newCount === 0 && scanResults.length > 0 && (
+        <div className="feedback show-info">All discovered files have already been imported.</div>
+      )}
+    </>
+  )
+}
+
+function RepositoriesTab() {
+  const { toast } = useToast()
+  const [skills, setSkills] = useState<RemoteSkill[]>([])
+  const [loading, setLoading] = useState(false)
+  const [installing, setInstalling] = useState<Set<string>>(new Set())
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [error, setError] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
+
+  async function handleRefresh() {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await window.aide.listRemoteSkills()
+      setSkills(result)
+      setLoaded(true)
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleInstall(skill: RemoteSkill) {
+    setInstalling(prev => new Set(prev).add(skill.id))
+    try {
+      await window.aide.addRemoteSkill(skill.rawUrl, skill.id, skill.repo)
+      toast(`Installed ${skill.frontmatter?.name ?? skill.id}`, 'success')
+      setSkills(prev => prev.map(s => s.id === skill.id ? { ...s, already_installed: true } : s))
+    } catch (err) {
+      toast(`Error: ${err}`, 'error')
+    } finally {
+      setInstalling(prev => {
+        const next = new Set(prev)
+        next.delete(skill.id)
+        return next
+      })
+    }
+  }
+
+  function toggleExpanded(id: string) {
+    setExpandedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const grouped = skills.reduce<Record<string, RemoteSkill[]>>((acc, s) => {
+    if (!acc[s.repo]) acc[s.repo] = []
+    acc[s.repo]!.push(s)
+    return acc
+  }, {})
+
+  return (
+    <>
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Remote Skills</span>
+          <button
+            className="btn btn-primary btn-sm"
+            disabled={loading}
+            onClick={() => { void handleRefresh() }}
+          >
+            {loading ? 'Loading...' : loaded ? 'Refresh' : 'Load Skills'}
+          </button>
+        </div>
+        <div className="list-body">
+          {loading && (
+            <div className="empty"><span className="empty-icon">⏳</span>Fetching skills from GitHub...</div>
+          )}
+          {!loading && !loaded && (
+            <div className="empty">
+              <span className="empty-icon">📦</span>
+              Click <strong>Load Skills</strong> to browse skills from configured repositories.
+            </div>
+          )}
+          {!loading && loaded && skills.length === 0 && (
+            <div className="empty"><span className="empty-icon">📦</span>No skills found in configured repositories.</div>
+          )}
+          {!loading && loaded && Object.entries(grouped).map(([repo, repoSkills]) => (
+            <div key={repo}>
+              <div style={{ padding: '8px 14px 4px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {repo}
+              </div>
+              {repoSkills.map(skill => {
+                const expanded = expandedIds.has(skill.id)
+                return (
+                  <div key={skill.id} className={`mod-item${expanded ? ' expanded' : ''}`}>
+                    <div
+                      className="mod-row"
+                      onClick={e => {
+                        if ((e.target as Element).closest('button')) return
+                        toggleExpanded(skill.id)
+                      }}
+                    >
+                      <span className="skill-chevron">▶</span>
+                      <span className="badge badge-skill">skill</span>
+                      <span className="mod-name">{skill.frontmatter?.name ?? skill.id}</span>
+                      <span className="mod-version">{skill.id}</span>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        title="View on GitHub"
+                        onClick={() => { void window.aide.openExternal(skill.pageUrl) }}
+                      >
+                        ↗
+                      </button>
+                      {skill.already_installed
+                        ? <span className="pill">Installed</span>
+                        : (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            disabled={installing.has(skill.id)}
+                            onClick={() => { void handleInstall(skill) }}
+                          >
+                            {installing.has(skill.id) ? 'Installing...' : 'Install'}
+                          </button>
+                        )
+                      }
+                    </div>
+                    <div className="skill-detail">
+                      <SkillDetail frontmatter={skill.frontmatter} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      {error && <div className="feedback show-error">{error}</div>}
+    </>
   )
 }

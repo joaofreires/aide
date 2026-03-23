@@ -20,4 +20,7 @@ export const IPC = {
   COPY_PROJECT_SKILL:    'aide:copyProjectSkill',
   READ_SKILL_FRONTMATTER: 'aide:readSkillFrontmatter',
   IS_INITIALIZED: 'aide:isInitialized',
+  LIST_REMOTE_SKILLS: 'aide:listRemoteSkills',
+  ADD_REMOTE_SKILL: 'aide:addRemoteSkill',
+  OPEN_EXTERNAL: 'aide:openExternal',
 } as const

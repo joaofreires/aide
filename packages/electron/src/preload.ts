@@ -22,6 +22,7 @@ import type {
   ImportProjectSkillResult,
   CopyProjectSkillResult,
   SkillFrontmatter,
+  RemoteSkill,
 } from '@aide/core'
 
 type ConfigUpdates = Partial<Omit<GlobalConfig, 'version'>>
@@ -76,6 +77,15 @@ const aideAPI = {
 
   isInitialized: (): Promise<boolean> =>
     ipcRenderer.invoke(IPC.IS_INITIALIZED),
+
+  listRemoteSkills: (): Promise<RemoteSkill[]> =>
+    ipcRenderer.invoke(IPC.LIST_REMOTE_SKILLS),
+
+  addRemoteSkill: (rawUrl: string, skillId: string, repo: string): Promise<AddResult> =>
+    ipcRenderer.invoke(IPC.ADD_REMOTE_SKILL, rawUrl, skillId, repo),
+
+  openExternal: (url: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
 }
 
 contextBridge.exposeInMainWorld('aide', aideAPI)

@@ -10,6 +10,12 @@ const ScanRootSchema = z.object({
   depth: z.number().int().min(0).max(10),
 })
 
+export const SkillRepositorySchema = z.object({
+  owner: z.string(),
+  repo: z.string(),
+  path: z.string().default('skills'),
+})
+
 export const GlobalConfigSchema = z.object({
   version: z.literal('1'),
   auto_propagate: z.boolean().default(true),
@@ -58,11 +64,15 @@ export const GlobalConfigSchema = z.object({
     '__pycache__', 'vendor', '.npm', '.yarn', '.pnpm',
     'target', 'out', '.svelte-kit', 'coverage', 'tmp',
   ]),
+  skill_repositories: z.array(SkillRepositorySchema).default([
+    { owner: 'anthropics', repo: 'skills', path: 'skills' },
+  ]),
 })
 
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>
 export type TypedDir = z.infer<typeof TypedDirSchema>
 export type ScanRoot = z.infer<typeof ScanRootSchema>
+export type SkillRepository = z.infer<typeof SkillRepositorySchema>
 
 export const DEFAULT_CONFIG: GlobalConfig = {
   version: '1',
@@ -107,5 +117,8 @@ export const DEFAULT_CONFIG: GlobalConfig = {
     'node_modules', '.git', 'dist', 'build', '.next', '.cache',
     '__pycache__', 'vendor', '.npm', '.yarn', '.pnpm',
     'target', 'out', '.svelte-kit', 'coverage', 'tmp',
+  ],
+  skill_repositories: [
+    { owner: 'anthropics', repo: 'skills', path: 'skills' },
   ],
 }
