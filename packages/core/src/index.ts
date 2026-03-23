@@ -9,7 +9,7 @@ export type { AidePaths, ProjectArchivePaths } from './fs/aideDir.js'
 // Config
 export { readConfig, writeConfig, updateConfig } from './config/config.js'
 export { GlobalConfigSchema, DEFAULT_CONFIG } from './config/schema.js'
-export type { GlobalConfig, TypedDir, ScanRoot } from './config/schema.js'
+export type { GlobalConfig, TypedDir, ScanRoot, SkillRepository } from './config/schema.js'
 
 // Registry
 export {
@@ -64,6 +64,8 @@ export { enableProjectSkill } from './operations/enableProjectSkill.js'
 export { importProjectSkill } from './operations/importProjectSkill.js'
 export { copyProjectSkillToRels } from './operations/copyProjectSkillToRels.js'
 export { readSkillFrontmatter } from './operations/readSkillFrontmatter.js'
+export { listRemoteSkills } from './operations/listRemoteSkills.js'
+export { addRemoteSkill } from './operations/addRemoteSkill.js'
 export type { InitResult } from './operations/init.js'
 export type { ApplyOptions, ApplyResult } from './operations/apply.js'
 export type { AddOptions, AddResult } from './operations/add.js'
@@ -78,6 +80,7 @@ export type { DisableProjectSkillResult } from './operations/disableProjectSkill
 export type { EnableProjectSkillResult } from './operations/enableProjectSkill.js'
 export type { ImportProjectSkillResult } from './operations/importProjectSkill.js'
 export type { CopyProjectSkillResult } from './operations/copyProjectSkillToRels.js'
+export type { RemoteSkill } from './operations/listRemoteSkills.js'
 
 // Linking
 export { link, unlink } from './linking/linker.js'

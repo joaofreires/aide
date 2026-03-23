@@ -1,4 +1,4 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { ipcMain, dialog, BrowserWindow, shell } from 'electron'
 import {
   init,
   add,
@@ -20,6 +20,8 @@ import {
   copyProjectSkillToRels,
   readSkillFrontmatter,
   isAideDirInitialized,
+  listRemoteSkills,
+  addRemoteSkill,
 } from '@aide/core'
 import type { GlobalConfig } from '@aide/core'
 import { IPC } from './channels.js'
@@ -112,5 +114,17 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.IS_INITIALIZED, async () => {
     return isAideDirInitialized()
+  })
+
+  ipcMain.handle(IPC.LIST_REMOTE_SKILLS, async () => {
+    return listRemoteSkills()
+  })
+
+  ipcMain.handle(IPC.ADD_REMOTE_SKILL, async (_event, rawUrl: string, skillId: string, repo: string) => {
+    return addRemoteSkill(rawUrl, skillId, repo)
+  })
+
+  ipcMain.handle(IPC.OPEN_EXTERNAL, async (_event, url: string) => {
+    await shell.openExternal(url)
   })
 }
