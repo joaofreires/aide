@@ -79,7 +79,10 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: electron-${{ matrix.label }}
-          path: packages/electron/release
+          path: |
+            packages/electron/release/*.AppImage
+            packages/electron/release/*.dmg
+            packages/electron/release/*.exe
           if-no-files-found: error
 
   publish:
@@ -106,7 +109,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          mapfile -d '' files < <(find release-assets -type f -print0 | sort -z)
+          mapfile -d '' files < <(
+            find release-assets -maxdepth 1 -type f \
+              \( -name '*.AppImage' -o -name '*.dmg' -o -name '*.exe' \) \
+              -print0 | sort -z
+          )
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No release assets were downloaded." >&2
             exit 1
