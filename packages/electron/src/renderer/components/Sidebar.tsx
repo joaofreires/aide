@@ -9,8 +9,13 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
   return (
     <div id="sidebar">
       <div className="logo">
-        <div className="logo-title">Aide</div>
-        <div className="logo-sub">AI Mod Manager</div>
+        <div className="logo-row">
+          <img className="logo-mark" src="icon.svg" alt="" />
+          <div>
+            <div className="logo-title">Aide</div>
+            <div className="logo-sub">AI Mod Manager</div>
+          </div>
+        </div>
       </div>
       <nav>
         <div className="nav-section">Library</div>

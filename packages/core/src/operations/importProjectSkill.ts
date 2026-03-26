@@ -25,8 +25,9 @@ export async function importProjectSkill(
   if (!['local-unique', 'local-modified'].includes(skill.status)) {
     throw new AideError(`Only local skills can be imported (status: ${skill.status})`, 'INVALID_STATE')
   }
-  if (!skill.project_path) {
-    throw new AideError(`Skill "${skillId}" has no project path`, 'SKILL_NOT_FOUND')
+  const sourcePath = skill.project_path ?? skill.global_paths[0] ?? null
+  if (!sourcePath) {
+    throw new AideError(`Skill "${skillId}" has no importable path`, 'SKILL_NOT_FOUND')
   }
 
   const projectName = basename(projectPath)
@@ -47,7 +48,7 @@ export async function importProjectSkill(
   }
 
   await add({
-    filePath: skill.project_path,
+    filePath: sourcePath,
     type: 'skill',
     id: targetId,
     ...(homeOverride !== undefined ? { homeOverride } : {}),

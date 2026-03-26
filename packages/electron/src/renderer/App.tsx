@@ -37,7 +37,7 @@ function InitPrompt({ onDone }: { onDone: () => void }) {
       gap: '16px',
       background: 'var(--bg)',
     }}>
-      <div style={{ fontSize: '32px' }}>📦</div>
+      <img className="welcome-mark" src="icon.svg" alt="" />
       <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>Welcome to Aide</div>
       <div style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '300px', lineHeight: 1.6 }}>
         Set up your <code style={{ color: 'var(--accent)' }}>~/.aide</code> directory to get started managing AI context files.

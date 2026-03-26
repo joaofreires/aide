@@ -18,34 +18,38 @@ const resolveTsExtensions: Plugin = {
   },
 }
 
-export default defineConfig([
-  {
-    entry: ['src/main.ts'],
-    format: ['cjs'],
-    dts: false,
-    clean: true,
-    external: ['electron'],
-    noExternal: [/@aide\/core/],
-    outDir: 'dist',
-  },
-  {
-    entry: ['src/preload.ts'],
-    format: ['cjs'],
-    dts: false,
-    external: ['electron'],
-    outDir: 'dist',
-  },
-  {
-    entry: { renderer: 'src/renderer/index.tsx' },
-    format: ['iife'],
-    dts: false,
-    noExternal: ['react', 'react-dom'],
-    outDir: 'dist/renderer',
-    onSuccess: 'cp src/renderer/index.html src/renderer/styles.css dist/renderer/',
-    esbuildOptions(options) {
-      options.jsx = 'automatic'
-      options.define = { 'process.env.NODE_ENV': '"development"' }
+export default defineConfig(overrideOptions => {
+  const shouldClean = !overrideOptions.watch
+
+  return [
+    {
+      entry: ['src/main.ts'],
+      format: ['cjs'],
+      dts: false,
+      clean: shouldClean,
+      external: ['electron'],
+      noExternal: [/@aide\/core/],
+      outDir: 'dist',
     },
-    esbuildPlugins: [resolveTsExtensions],
-  },
-])
+    {
+      entry: ['src/preload.ts'],
+      format: ['cjs'],
+      dts: false,
+      external: ['electron'],
+      outDir: 'dist',
+    },
+    {
+      entry: { renderer: 'src/renderer/index.tsx' },
+      format: ['iife'],
+      dts: false,
+      noExternal: ['react', 'react-dom'],
+      outDir: 'dist/renderer',
+      onSuccess: 'node ./scripts/copy-renderer-assets.mjs',
+      esbuildOptions(options) {
+        options.jsx = 'automatic'
+        options.define = { 'process.env.NODE_ENV': '"development"' }
+      },
+      esbuildPlugins: [resolveTsExtensions],
+    },
+  ]
+})

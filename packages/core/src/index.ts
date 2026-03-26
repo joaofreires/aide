@@ -2,9 +2,17 @@
 export * from './errors/AideError.js'
 
 // FS utilities
-export { getAidePaths, ensureAideDir, isAideDirInitialized, getProjectArchivePaths, ensureProjectArchiveDir } from './fs/aideDir.js'
+export {
+  getAidePaths,
+  ensureAideDir,
+  isAideDirInitialized,
+  getProjectArchivePaths,
+  ensureProjectArchiveDir,
+  getGlobalSkillArchivePaths,
+  ensureGlobalSkillArchiveDir,
+} from './fs/aideDir.js'
 export { assertExecutable, isReadable, isWritable } from './fs/permissions.js'
-export type { AidePaths, ProjectArchivePaths } from './fs/aideDir.js'
+export type { AidePaths, ProjectArchivePaths, GlobalSkillArchivePaths } from './fs/aideDir.js'
 
 // Config
 export { readConfig, writeConfig, updateConfig } from './config/config.js'

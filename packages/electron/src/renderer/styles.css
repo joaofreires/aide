@@ -44,6 +44,17 @@ body {
   padding: 18px 16px 14px;
   border-bottom: 1px solid var(--border);
 }
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-mark {
+  width: 28px;
+  height: 28px;
+  display: block;
+  flex-shrink: 0;
+}
 .logo-title {
   font-size: 17px;
   font-weight: 700;
@@ -209,8 +220,35 @@ nav {
   border-bottom: 1px solid var(--border);
 }
 .project-item:last-child { border-bottom: none; }
+.project-main { flex: 1; min-width: 0; overflow: hidden; }
 .project-path { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-templates { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.project-global-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  min-height: 20px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.project-global-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.project-global-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.project-global-pill {
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(88,166,255,0.25);
+  background: rgba(88,166,255,0.08);
+  color: var(--accent);
+  font-size: 10.5px;
+}
 
 /* ── Empty ── */
 .empty {
@@ -221,6 +259,12 @@ nav {
   line-height: 1.5;
 }
 .empty-icon { font-size: 28px; display: block; margin-bottom: 8px; }
+.welcome-mark {
+  width: 88px;
+  height: 88px;
+  display: block;
+  filter: drop-shadow(0 14px 28px rgba(48, 225, 179, 0.12));
+}
 
 /* ── Forms ── */
 .form-group { margin-bottom: 14px; }
@@ -423,6 +467,18 @@ select { cursor: pointer; }
 .skill-item.expanded .skill-chevron { transform: rotate(90deg); }
 .skill-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-meta { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.skill-scope-pill {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(255,184,77,0.12);
+  color: #ffd08a;
+  border: 1px solid rgba(255,184,77,0.28);
+  flex-shrink: 0;
+}
 .skill-ai-badges { display: flex; gap: 4px; flex-wrap: wrap; flex-shrink: 0; }
 .skill-ai-badge {
   font-size: 9px;

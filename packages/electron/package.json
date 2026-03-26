@@ -28,8 +28,10 @@
     "appId": "dev.aide.app",
     "productName": "Aide",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "icon": "icon.png",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "assets"
     },
     "files": [
       "dist/**/*",

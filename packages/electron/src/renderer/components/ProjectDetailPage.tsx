@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { ProjectSkill, ProjectSkillsResult } from '@aide/core'
 import { useToast } from '../hooks/useToast.js'
 import { SkillDetail } from './shared/SkillDetail.js'
@@ -11,10 +11,25 @@ interface ProjectDetailPageProps {
   onBack: () => void
 }
 
-/** Derive short AI tool name from a skill rel path, e.g. ".codex/skills" → "codex" */
 function aiToolName(rel: string): string {
   const part = rel.split('/')[0] ?? rel
   return part.replace(/^\./, '')
+}
+
+function isGlobalArchived(skill: ProjectSkill): boolean {
+  return Boolean(skill.global_archive_path) && !skill.is_global && skill.preferred_enable_scope === 'global'
+}
+
+function providerRels(skill: ProjectSkill): string[] {
+  const rels = skill.all_project_rels.length
+    ? skill.all_project_rels
+    : skill.global_rels.length
+      ? skill.global_rels
+      : skill.original_rels.length
+        ? skill.original_rels
+        : skill.global_original_rels
+
+  return [...new Set(rels)]
 }
 
 export function ProjectDetailPage({ projectPath, onBack }: ProjectDetailPageProps) {
@@ -28,8 +43,8 @@ export function ProjectDetailPage({ projectPath, onBack }: ProjectDetailPageProp
   async function load() {
     setError(null)
     try {
-      const r = await window.aide.listProjectSkills(projectPath)
-      setResult(r)
+      const next = await window.aide.listProjectSkills(projectPath)
+      setResult(next)
     } catch (err) {
       setError(String(err))
     }
@@ -53,12 +68,19 @@ export function ProjectDetailPage({ projectPath, onBack }: ProjectDetailPageProp
 
   async function handleEnable(skillId: string, targetRels?: string[]) {
     try {
-      const r = await window.aide.enableProjectSkill(projectPath, skillId, targetRels)
-      if (r.restore_warning) {
-        toast(`Enabled with warning — hover ⚠ for details`, 'success')
-        setRestoreWarnings(prev => new Map(prev).set(skillId, r.restore_warning!))
+      const response = await window.aide.enableProjectSkill(projectPath, skillId, targetRels)
+      setRestoreWarnings(prev => {
+        const next = new Map(prev)
+        next.delete(skillId)
+        if (response.restore_warning) next.set(skillId, response.restore_warning)
+        return next
+      })
+
+      const label = response.enabled_scope === 'global' ? 'Enabled Global' : 'Enabled'
+      if (response.restore_warning) {
+        toast(`${label} "${skillId}" with warning — hover ⚠ for details`, 'success')
       } else {
-        toast(`Enabled "${skillId}"`, 'success')
+        toast(`${label} "${skillId}"`, 'success')
       }
       await load()
     } catch (err) {
@@ -68,13 +90,15 @@ export function ProjectDetailPage({ projectPath, onBack }: ProjectDetailPageProp
 
   async function handleDisable(skillId: string) {
     try {
-      const r = await window.aide.disableProjectSkill(projectPath, skillId)
-      if (r.warnings && r.warnings.length > 0) {
-        toast(`Disabled "${skillId}" — ${r.warnings[0]}`, 'error')
+      const response = await window.aide.disableProjectSkill(projectPath, skillId)
+      const label = response.disabled_scope === 'global' ? 'Disabled Global' : 'Disabled'
+
+      if (response.warnings.length > 0) {
+        toast(`${label} "${skillId}" — ${response.warnings[0]}`, 'success')
       } else {
-        toast(`Disabled "${skillId}"`, 'success')
+        toast(`${label} "${skillId}"`, 'success')
       }
-      void load()
+      await load()
     } catch (err) {
       toast(`Failed to disable: ${err}`, 'error')
     }
@@ -82,9 +106,9 @@ export function ProjectDetailPage({ projectPath, onBack }: ProjectDetailPageProp
 
   async function handleCopy(skillId: string, targetRels?: string[]) {
     try {
-      const r = await window.aide.copyProjectSkill(projectPath, skillId, targetRels)
-      toast(`Enabled "${skillId}" in ${r.copied_to.length} dir(s)`, 'success')
-      void load()
+      const response = await window.aide.copyProjectSkill(projectPath, skillId, targetRels)
+      toast(`Enabled "${skillId}" in ${response.copied_to.length} dir(s)`, 'success')
+      await load()
     } catch (err) {
       toast(`Failed to copy skill: ${err}`, 'error')
     }
@@ -92,110 +116,115 @@ export function ProjectDetailPage({ projectPath, onBack }: ProjectDetailPageProp
 
   async function handleImport(skillId: string) {
     try {
-      const r = await window.aide.importProjectSkill(projectPath, skillId)
-      toast(`Imported as "${r.imported_as}"`, 'success')
-      void load()
+      const response = await window.aide.importProjectSkill(projectPath, skillId)
+      toast(`Imported as "${response.imported_as}"`, 'success')
+      await load()
     } catch (err) {
       toast(`Failed to import: ${err}`, 'error')
     }
   }
 
+  function buildProjectEnableButton(skillId: string, rels: string[]): React.ReactNode {
+    if (rels.length > 1) {
+      return (
+        <SplitButton
+          mainLabel="Enable"
+          onMainClick={() => { void handleEnable(skillId) }}
+          items={[
+            { label: 'All frameworks', onClick: () => { void handleEnable(skillId) } },
+            ...rels.map(rel => ({
+              label: `${aiToolName(rel)} only`,
+              onClick: () => { void handleEnable(skillId, [rel]) },
+            })),
+          ]}
+        />
+      )
+    }
+
+    return (
+      <button className="btn btn-secondary btn-sm" onClick={() => { void handleEnable(skillId) }}>
+        Enable
+      </button>
+    )
+  }
+
   function buildActions(skill: ProjectSkill) {
     const activeRels = result?.active_skill_rels ?? []
+    const canEnableGlobal = isGlobalArchived(skill)
+    const globalEnableButton = canEnableGlobal ? (
+      <button className="btn btn-secondary btn-sm" onClick={() => { void handleEnable(skill.id) }}>
+        Enable Global
+      </button>
+    ) : null
 
     switch (skill.status) {
-      case 'library-inactive': {
-        if (activeRels.length > 1) {
-          return (
-            <SplitButton
-              mainLabel="Enable"
-              onMainClick={() => { void handleEnable(skill.id) }}
-              items={[
-                { label: 'All frameworks', onClick: () => { void handleEnable(skill.id) } },
-                ...activeRels.map(r => ({
-                  label: `${aiToolName(r)} only`,
-                  onClick: () => { void handleEnable(skill.id, [r]) },
-                })),
-              ]}
-            />
-          )
-        }
-        return (
-          <button className="btn btn-secondary btn-sm" onClick={() => { void handleEnable(skill.id) }}>
-            Enable
-          </button>
-        )
-      }
+      case 'library-inactive':
+        return canEnableGlobal
+          ? globalEnableButton
+          : buildProjectEnableButton(skill.id, activeRels)
 
       case 'library-active':
         return (
-          <button className="btn btn-danger btn-sm" onClick={() => { void handleDisable(skill.id) }}>
-            Disable
-          </button>
+          <>
+            {globalEnableButton}
+            <button className="btn btn-danger btn-sm" onClick={() => { void handleDisable(skill.id) }}>
+              {skill.is_global ? 'Disable Global' : 'Disable'}
+            </button>
+          </>
         )
 
       case 'local-unique':
       case 'local-modified': {
-        const missing = activeRels.filter(r => !(skill.all_project_rels ?? []).includes(r))
-        let copyBtn: React.ReactNode = null
+        const missing = skill.project_path
+          ? activeRels.filter(rel => !skill.all_project_rels.includes(rel))
+          : []
+
+        let copyButton: React.ReactNode = null
         if (missing.length > 1) {
-          copyBtn = (
+          copyButton = (
             <SplitButton
               mainLabel="Enable for all"
               onMainClick={() => { void handleCopy(skill.id) }}
               items={[
                 { label: 'All frameworks', onClick: () => { void handleCopy(skill.id) } },
-                ...missing.map(r => ({
-                  label: `${aiToolName(r)} only`,
-                  onClick: () => { void handleCopy(skill.id, [r]) },
+                ...missing.map(rel => ({
+                  label: `${aiToolName(rel)} only`,
+                  onClick: () => { void handleCopy(skill.id, [rel]) },
                 })),
               ]}
             />
           )
         } else if (missing.length === 1) {
-          const r = missing[0]!
-          copyBtn = (
-            <button className="btn btn-secondary btn-sm" onClick={() => { void handleCopy(skill.id, [r]) }}>
-              Enable for {aiToolName(r)}
+          copyButton = (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => { void handleCopy(skill.id, [missing[0]!]) }}
+            >
+              Enable for {aiToolName(missing[0]!)}
             </button>
           )
         }
+
         return (
           <>
-            {copyBtn}
+            {globalEnableButton}
+            {copyButton}
             <button className="btn btn-danger btn-sm" onClick={() => { void handleDisable(skill.id) }}>
-              Disable
+              {skill.is_global ? 'Disable Global' : 'Disable'}
             </button>
-            <button className="btn btn-secondary btn-sm" onClick={() => { void handleImport(skill.id) }}>
-              Import to Library
-            </button>
+            {(skill.project_path || skill.global_paths.length > 0) && (
+              <button className="btn btn-secondary btn-sm" onClick={() => { void handleImport(skill.id) }}>
+                Import to Library
+              </button>
+            )}
           </>
         )
       }
 
-      case 'archived': {
-        const rels = skill.original_rels ?? []
-        if (rels.length > 1) {
-          return (
-            <SplitButton
-              mainLabel="Enable"
-              onMainClick={() => { void handleEnable(skill.id) }}
-              items={[
-                { label: 'All frameworks', onClick: () => { void handleEnable(skill.id) } },
-                ...rels.map(r => ({
-                  label: `${aiToolName(r)} only`,
-                  onClick: () => { void handleEnable(skill.id, [r]) },
-                })),
-              ]}
-            />
-          )
-        }
-        return (
-          <button className="btn btn-secondary btn-sm" onClick={() => { void handleEnable(skill.id) }}>
-            Enable
-          </button>
-        )
-      }
+      case 'archived':
+        return canEnableGlobal
+          ? globalEnableButton
+          : buildProjectEnableButton(skill.id, skill.original_rels)
 
       default:
         return null
@@ -204,10 +233,15 @@ export function ProjectDetailPage({ projectPath, onBack }: ProjectDetailPageProp
 
   function getFiltered(): ProjectSkill[] {
     if (!result) return []
-    return result.skills.filter(s => {
+
+    return result.skills.filter(skill => {
+      const globalArchived = isGlobalArchived(skill)
+
       if (filter === 'all') return true
-      if (filter === 'local') return s.status === 'local-unique' || s.status === 'local-modified'
-      return s.status === filter
+      if (filter === 'local') return skill.status === 'local-unique' || skill.status === 'local-modified'
+      if (filter === 'archived') return skill.status === 'archived' || globalArchived
+      if (filter === 'library-inactive') return skill.status === 'library-inactive' && !globalArchived
+      return skill.status === filter
     })
   }
 
@@ -231,47 +265,40 @@ export function ProjectDetailPage({ projectPath, onBack }: ProjectDetailPageProp
     if (filtered.length === 0) {
       return <div className="empty"><span className="empty-icon">🔍</span>No skills match this filter.</div>
     }
+
     return (
       <>
         {filtered.map(skill => {
           const expanded = expandedIds.has(skill.id)
-          const statusLabel = skill.status.replace(/-/g, ' ')
-          const allRels = skill.all_project_rels?.length
-            ? skill.all_project_rels
-            : skill.original_rels?.length
-              ? skill.original_rels
-              : []
+          const rels = providerRels(skill)
           const warning = restoreWarnings.get(skill.id)
+          const showGlobalPill = skill.is_global || Boolean(skill.global_archive_path)
 
           return (
-            <div
-              key={skill.id}
-              className={`skill-item${expanded ? ' expanded' : ''}`}
-            >
+            <div key={skill.id} className={`skill-item${expanded ? ' expanded' : ''}`}>
               <div
                 className="skill-row"
-                onClick={e => {
-                  const t = e.target as Element
-                  if (t.closest('button') || t.closest('.btn-split-arrow') || t.closest('.split-dropdown')) return
+                onClick={event => {
+                  const target = event.target as Element
+                  if (target.closest('button') || target.closest('.btn-split-arrow') || target.closest('.split-dropdown')) return
                   toggleExpanded(skill.id)
                 }}
               >
                 <span className="skill-chevron">▶</span>
-                <span className={`skill-status-badge status-${skill.status}`}>{statusLabel}</span>
+                <span className={`skill-status-badge status-${skill.status}`}>{skill.status.replace(/-/g, ' ')}</span>
                 <div className="skill-meta">
                   <span className="skill-name">{skill.id}</span>
-                  {allRels.length > 0 && (
+                  {showGlobalPill && <span className="skill-scope-pill">Global</span>}
+                  {rels.length > 0 && (
                     <span className="skill-ai-badges">
-                      {allRels.map(r => (
-                        <span key={r} className="skill-ai-badge">{aiToolName(r)}</span>
+                      {rels.map(rel => (
+                        <span key={rel} className="skill-ai-badge">{aiToolName(rel)}</span>
                       ))}
                     </span>
                   )}
                 </div>
                 <div className="skill-actions">
-                  {warning && (
-                    <span className="restore-warning" data-tip={warning}>⚠</span>
-                  )}
+                  {warning && <span className="restore-warning" data-tip={warning}>⚠</span>}
                   {buildActions(skill)}
                 </div>
               </div>

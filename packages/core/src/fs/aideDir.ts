@@ -46,6 +46,10 @@ export interface ProjectArchivePaths {
   skillsDir: string    // ~/.aide/projects/{name}/skills
 }
 
+export interface GlobalSkillArchivePaths {
+  skillsDir: string    // ~/.aide/global-skills
+}
+
 export function getProjectArchivePaths(projectPath: string, homeOverride?: string): ProjectArchivePaths {
   const home = homeOverride ?? homedir()
   const projectName = basename(projectPath)
@@ -58,6 +62,19 @@ export async function ensureProjectArchiveDir(
   homeOverride?: string,
 ): Promise<ProjectArchivePaths> {
   const paths = getProjectArchivePaths(projectPath, homeOverride)
+  await mkdir(paths.skillsDir, { recursive: true })
+  return paths
+}
+
+export function getGlobalSkillArchivePaths(homeOverride?: string): GlobalSkillArchivePaths {
+  const paths = getAidePaths(homeOverride)
+  return { skillsDir: join(paths.root, 'global-skills') }
+}
+
+export async function ensureGlobalSkillArchiveDir(
+  homeOverride?: string,
+): Promise<GlobalSkillArchivePaths> {
+  const paths = getGlobalSkillArchivePaths(homeOverride)
   await mkdir(paths.skillsDir, { recursive: true })
   return paths
 }

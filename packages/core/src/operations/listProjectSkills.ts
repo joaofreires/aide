@@ -1,23 +1,26 @@
-import { readFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join, basename, extname, dirname } from 'node:path'
 import { createHash } from 'node:crypto'
-import { parseFrontmatter } from '../skills/frontmatter.js'
-import { readRegistry } from '../registry/registry.js'
+import { existsSync } from 'node:fs'
+import { readFile, readdir, stat } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { basename, dirname, extname, join } from 'node:path'
 import { readConfig } from '../config/config.js'
-import { getProjectArchivePaths } from '../fs/aideDir.js'
+import {
+  getGlobalSkillArchivePaths,
+  getProjectArchivePaths,
+} from '../fs/aideDir.js'
+import { readRegistry } from '../registry/registry.js'
+import { parseFrontmatter } from '../skills/frontmatter.js'
 import { listTypedEntries } from './discover.js'
 
 export { type SkillFrontmatter } from '../skills/frontmatter.js'
 import type { SkillFrontmatter } from '../skills/frontmatter.js'
 
 export type ProjectSkillStatus =
-  | 'library-active'    // lib skill, copy present in project's skill dir (same checksum)
-  | 'library-inactive'  // lib skill, not in any project skill dir
-  | 'local-unique'      // in project, not in library
-  | 'local-modified'    // in project, same name as lib skill but different checksum
-  | 'archived'          // disabled local skill in ~/.aide/projects/{name}/skills/
+  | 'library-active'    // active copy exists in project or global provider dir and matches the library
+  | 'library-inactive'  // library skill has no active project/global copy
+  | 'local-unique'      // active copy exists but no library skill exists
+  | 'local-modified'    // active copy exists but differs from the library
+  | 'archived'          // no active copy exists, but an archived copy can be restored
 
 export interface ProjectSkill {
   id: string
@@ -29,11 +32,17 @@ export interface ProjectSkill {
   project_checksum: string | null
   project_rel: string | null
   archive_path: string | null
-  original_rel: string | null       // first original rel (display compat)
-  all_project_paths: string[]       // every project-level path where this skill exists
-  all_project_rels: string[]        // every project-level rel dir where this skill exists
-  home_paths: string[]              // home-level paths (global, cannot be disabled per-project)
-  original_rels: string[]           // from archive meta (all dirs it was in before disable)
+  original_rel: string | null
+  all_project_paths: string[]
+  all_project_rels: string[]
+  home_paths: string[]              // legacy alias for global_paths
+  global_paths: string[]
+  global_rels: string[]
+  is_global: boolean
+  global_archive_path: string | null
+  global_original_rels: string[]
+  preferred_enable_scope: 'project' | 'global'
+  original_rels: string[]
   frontmatter: SkillFrontmatter | null
 }
 
@@ -42,14 +51,29 @@ export interface ProjectSkillsResult {
   project_name: string
   skills: ProjectSkill[]
   primary_skill_rel: string
-  active_skill_rels: string[]   // all skill dirs that actually exist in the project
+  active_skill_rels: string[]
 }
 
 export interface ArchivedSkillMeta {
   id: string
-  original_rels: string[]   // all rel dirs the skill was in (replaces original_rel)
+  original_rels: string[]
   archived_at: string
   was_skill_md: boolean
+}
+
+interface ActiveSkillEntry {
+  path: string
+  rel: string
+  checksum: string
+  paths: string[]
+  rels: string[]
+  frontmatter: SkillFrontmatter | null
+}
+
+interface ArchivedSkillEntry {
+  archive_path: string
+  meta: ArchivedSkillMeta | null
+  frontmatter: SkillFrontmatter | null
 }
 
 function computeChecksum(content: Buffer | string): string {
@@ -62,6 +86,149 @@ function deriveId(filePath: string): string {
     : basename(filePath, extname(filePath))
 }
 
+async function readFrontmatterFromFile(filePath: string): Promise<SkillFrontmatter | null> {
+  try {
+    const text = await readFile(filePath, 'utf8')
+    return parseFrontmatter(text)
+  } catch {
+    return null
+  }
+}
+
+async function scanActiveSkills(
+  dir: string,
+  rel: string,
+  target: Map<string, ActiveSkillEntry>,
+): Promise<void> {
+  const files = await listTypedEntries(dir)
+  for (const filePath of files) {
+    try {
+      const content = await readFile(filePath)
+      const id = deriveId(filePath)
+      const existing = target.get(id)
+      if (existing) {
+        existing.paths.push(filePath)
+        if (!existing.rels.includes(rel)) existing.rels.push(rel)
+        continue
+      }
+
+      target.set(id, {
+        path: filePath,
+        rel,
+        checksum: computeChecksum(content),
+        paths: [filePath],
+        rels: [rel],
+        frontmatter: parseFrontmatter(content.toString('utf8')),
+      })
+    } catch {
+      // Skip unreadable entries.
+    }
+  }
+}
+
+async function readArchiveMeta(metaPath: string): Promise<ArchivedSkillMeta | null> {
+  if (!existsSync(metaPath)) return null
+
+  try {
+    const raw = JSON.parse(await readFile(metaPath, 'utf8'))
+    if (!raw.original_rels && raw.original_rel) {
+      raw.original_rels = [raw.original_rel]
+    }
+    raw.original_rels ??= []
+    return raw as ArchivedSkillMeta
+  } catch {
+    return null
+  }
+}
+
+async function readArchiveFrontmatter(archivePath: string): Promise<SkillFrontmatter | null> {
+  try {
+    const archiveStat = await stat(archivePath)
+    const skillMdPath = archiveStat.isDirectory() ? join(archivePath, 'SKILL.md') : archivePath
+    const text = await readFile(skillMdPath, 'utf8')
+    return parseFrontmatter(text)
+  } catch {
+    return null
+  }
+}
+
+async function scanArchivedSkills(archiveDir: string): Promise<Map<string, ArchivedSkillEntry>> {
+  const archivedSkills = new Map<string, ArchivedSkillEntry>()
+  if (!existsSync(archiveDir)) return archivedSkills
+
+  const dirents = await readdir(archiveDir, { withFileTypes: true })
+  for (const dirent of dirents) {
+    if (dirent.name.endsWith('.meta.json')) continue
+
+    const id = dirent.isDirectory() ? dirent.name : basename(dirent.name, extname(dirent.name))
+    const archivePath = join(archiveDir, dirent.name)
+    archivedSkills.set(id, {
+      archive_path: archivePath,
+      meta: await readArchiveMeta(join(archiveDir, `${id}.meta.json`)),
+      frontmatter: await readArchiveFrontmatter(archivePath),
+    })
+  }
+
+  return archivedSkills
+}
+
+function buildSkillRecord(args: {
+  id: string
+  status: ProjectSkillStatus
+  library_path: string | null
+  library_checksum: string | null
+  project: ActiveSkillEntry | null
+  project_archive: ArchivedSkillEntry | null
+  global: ActiveSkillEntry | null
+  global_archive: ArchivedSkillEntry | null
+  frontmatter: SkillFrontmatter | null
+}): ProjectSkill {
+  const {
+    id,
+    status,
+    library_path,
+    library_checksum,
+    project,
+    project_archive,
+    global,
+    global_archive,
+    frontmatter,
+  } = args
+
+  const projectOriginalRels = project_archive?.meta?.original_rels ?? []
+  const globalOriginalRels = global_archive?.meta?.original_rels ?? []
+  const preferred_enable_scope: 'project' | 'global' =
+    project_archive
+      ? 'project'
+      : global_archive && !global
+        ? 'global'
+        : 'project'
+
+  return {
+    id,
+    name: id,
+    status,
+    library_path,
+    library_checksum,
+    project_path: project?.path ?? null,
+    project_checksum: project?.checksum ?? null,
+    project_rel: project?.rel ?? null,
+    archive_path: project_archive?.archive_path ?? null,
+    original_rel: projectOriginalRels[0] ?? null,
+    all_project_paths: project?.paths ?? [],
+    all_project_rels: project?.rels ?? [],
+    home_paths: global?.paths ?? [],
+    global_paths: global?.paths ?? [],
+    global_rels: global?.rels ?? [],
+    is_global: Boolean(global),
+    global_archive_path: global_archive?.archive_path ?? null,
+    global_original_rels: globalOriginalRels,
+    preferred_enable_scope,
+    original_rels: projectOriginalRels,
+    frontmatter,
+  }
+}
+
 export async function listProjectSkills(
   projectPath: string,
   homeOverride?: string,
@@ -70,200 +237,122 @@ export async function listProjectSkills(
     readConfig(homeOverride),
     readRegistry(homeOverride),
   ])
-  const archPaths = getProjectArchivePaths(projectPath, homeOverride)
+
+  const home = homeOverride ?? homedir()
+  const projectArchives = getProjectArchivePaths(projectPath, homeOverride)
+  const globalArchives = getGlobalSkillArchivePaths(homeOverride)
   const projectName = basename(projectPath)
 
-  // ── Step 1: scan project's skill dirs + home-level dirs for AI tools in use ──
-  const home = homeOverride ?? homedir()
-  type SkillEntry = { path: string; rel: string; checksum: string; all_project_paths: string[]; all_project_rels: string[]; home_paths: string[]; frontmatter: SkillFrontmatter | null }
-  const projectSkills = new Map<string, SkillEntry>()
-
-  async function scanDir(dir: string, rel: string, isHome: boolean) {
-    const files = await listTypedEntries(dir)
-    for (const filePath of files) {
-      const id = deriveId(filePath)
-      const existing = projectSkills.get(id)
-      if (existing) {
-        if (isHome) {
-          existing.home_paths.push(filePath)
-        } else {
-          existing.all_project_paths.push(filePath)
-          if (!existing.all_project_rels.includes(rel)) existing.all_project_rels.push(rel)
-        }
-      } else {
-        try {
-          const content = await readFile(filePath)
-          const text = content.toString('utf8')
-          projectSkills.set(id, {
-            path: filePath, rel, checksum: computeChecksum(content),
-            all_project_paths: isHome ? [] : [filePath],
-            all_project_rels: isHome ? [] : [rel],
-            home_paths: isHome ? [filePath] : [],
-            frontmatter: parseFrontmatter(text),
-          })
-        } catch { /* skip unreadable */ }
-      }
-    }
-  }
+  const projectSkills = new Map<string, ActiveSkillEntry>()
+  const globalSkills = new Map<string, ActiveSkillEntry>()
 
   for (const entry of config.skill_dirs) {
-    // Scan project-level skill dir (e.g. projectPath/.codex/skills/)
-    await scanDir(join(projectPath, entry.rel), entry.rel, false)
-
-    // If this AI tool is in use by the project (e.g. .codex/ exists),
-    // also scan the home-level skill dir (e.g. ~/.codex/skills/)
-    const toolDir = dirname(entry.rel)  // e.g. ".codex" from ".codex/skills"
-    if (existsSync(join(projectPath, toolDir))) {
-      const homeSkillDir = join(home, entry.rel)
-      if (homeSkillDir !== join(projectPath, entry.rel)) {
-        await scanDir(homeSkillDir, entry.rel, true)
-      }
-    }
+    await scanActiveSkills(join(projectPath, entry.rel), entry.rel, projectSkills)
+    await scanActiveSkills(join(home, entry.rel), entry.rel, globalSkills)
   }
 
-  // ── Step 2: scan archive dir ───────────────────────────────────────────────
-  const archivedSkills = new Map<string, { archive_path: string; meta: ArchivedSkillMeta | null }>()
-  if (existsSync(archPaths.skillsDir)) {
-    const { readdir } = await import('node:fs/promises')
-    const dirents = await readdir(archPaths.skillsDir, { withFileTypes: true })
-    for (const dirent of dirents) {
-      if (dirent.name.endsWith('.meta.json')) continue
-      const id = dirent.isDirectory() ? dirent.name : basename(dirent.name, extname(dirent.name))
-      const archivePath = join(archPaths.skillsDir, dirent.name)
-      const metaPath = join(archPaths.skillsDir, id + '.meta.json')
-      let meta: ArchivedSkillMeta | null = null
-      if (existsSync(metaPath)) {
-        try {
-          const raw = JSON.parse(await readFile(metaPath, 'utf8'))
-          // Backward compat: old archives have original_rel (string) instead of original_rels
-          if (!raw.original_rels && raw.original_rel) {
-            raw.original_rels = [raw.original_rel]
-          }
-          raw.original_rels ??= []
-          meta = raw as ArchivedSkillMeta
-        } catch { /* skip */ }
-      }
-      archivedSkills.set(id, { archive_path: archivePath, meta })
-    }
-  }
+  const [projectArchivedSkills, globalArchivedSkills] = await Promise.all([
+    scanArchivedSkills(projectArchives.skillsDir),
+    scanArchivedSkills(globalArchives.skillsDir),
+  ])
 
-  // ── Step 3: build skill list ───────────────────────────────────────────────
   const skills: ProjectSkill[] = []
   const seen = new Set<string>()
 
-  // Library skills
-  const libSkills = Object.values(registry.mods).filter(m => m.type === 'skill')
-  for (const lib of libSkills) {
-    seen.add(lib.id)
-    const proj = projectSkills.get(lib.id)
-    if (proj) {
-      const checksumMatch = lib.checksum !== null && proj.checksum === lib.checksum
-      skills.push({
-        id: lib.id,
-        name: lib.id,
-        status: checksumMatch ? 'library-active' : 'local-modified',
-        library_path: lib.path,
-        library_checksum: lib.checksum,
-        project_path: proj.path,
-        project_checksum: proj.checksum,
-        project_rel: proj.rel,
-        archive_path: null,
-        original_rel: null,
-        all_project_paths: proj.all_project_paths,
-        all_project_rels: proj.all_project_rels,
-        home_paths: proj.home_paths,
-        original_rels: [],
-        frontmatter: proj.frontmatter,
-      })
-    } else {
-      // library-inactive: read frontmatter from library copy
-      let libFrontmatter: SkillFrontmatter | null = null
-      if (lib.path) {
-        try {
-          const text = await readFile(lib.path, 'utf8')
-          libFrontmatter = parseFrontmatter(text)
-        } catch { /* skip */ }
-      }
-      skills.push({
-        id: lib.id,
-        name: lib.id,
-        status: 'library-inactive',
-        library_path: lib.path,
-        library_checksum: lib.checksum,
-        project_path: null,
-        project_checksum: null,
-        project_rel: null,
-        archive_path: null,
-        original_rel: null,
-        all_project_paths: [],
-        all_project_rels: [],
-        home_paths: [],
-        original_rels: [],
-        frontmatter: libFrontmatter,
-      })
-    }
+  const libraryFrontmatterCache = new Map<string, SkillFrontmatter | null>()
+  async function getLibraryFrontmatter(libraryPath: string | null): Promise<SkillFrontmatter | null> {
+    if (!libraryPath) return null
+    if (libraryFrontmatterCache.has(libraryPath)) return libraryFrontmatterCache.get(libraryPath) ?? null
+
+    const frontmatter = await readFrontmatterFromFile(libraryPath)
+    libraryFrontmatterCache.set(libraryPath, frontmatter)
+    return frontmatter
   }
 
-  // Local-unique skills (in project but not in library)
-  for (const [id, proj] of projectSkills) {
+  const librarySkills = Object.values(registry.mods).filter(mod => mod.type === 'skill')
+  for (const library of librarySkills) {
+    seen.add(library.id)
+
+    const projectSkill = projectSkills.get(library.id) ?? null
+    const globalSkill = globalSkills.get(library.id) ?? null
+    const projectArchive = projectArchivedSkills.get(library.id) ?? null
+    const globalArchive = globalArchivedSkills.get(library.id) ?? null
+    const activeSkill = projectSkill ?? globalSkill
+    const checksumMatch = activeSkill !== null
+      && library.checksum !== null
+      && activeSkill.checksum === library.checksum
+
+    const status: ProjectSkillStatus = activeSkill
+      ? checksumMatch ? 'library-active' : 'local-modified'
+      : projectArchive
+        ? 'archived'
+        : 'library-inactive'
+
+    const frontmatter =
+      projectSkill?.frontmatter
+      ?? globalSkill?.frontmatter
+      ?? projectArchive?.frontmatter
+      ?? globalArchive?.frontmatter
+      ?? await getLibraryFrontmatter(library.path)
+
+    skills.push(buildSkillRecord({
+      id: library.id,
+      status,
+      library_path: library.path,
+      library_checksum: library.checksum,
+      project: projectSkill,
+      project_archive: projectArchive,
+      global: globalSkill,
+      global_archive: globalArchive,
+      frontmatter,
+    }))
+  }
+
+  const nonLibraryIds = new Set<string>([
+    ...projectSkills.keys(),
+    ...globalSkills.keys(),
+    ...projectArchivedSkills.keys(),
+    ...globalArchivedSkills.keys(),
+  ])
+
+  for (const id of nonLibraryIds) {
     if (seen.has(id)) continue
     seen.add(id)
-    skills.push({
+
+    const projectSkill = projectSkills.get(id) ?? null
+    const globalSkill = globalSkills.get(id) ?? null
+    const projectArchive = projectArchivedSkills.get(id) ?? null
+    const globalArchive = globalArchivedSkills.get(id) ?? null
+    const activeSkill = projectSkill ?? globalSkill
+
+    skills.push(buildSkillRecord({
       id,
-      name: id,
-      status: 'local-unique',
+      status: activeSkill ? 'local-unique' : 'archived',
       library_path: null,
       library_checksum: null,
-      project_path: proj.path,
-      project_checksum: proj.checksum,
-      project_rel: proj.rel,
-      archive_path: null,
-      original_rel: null,
-      all_project_paths: proj.all_project_paths,
-      all_project_rels: proj.all_project_rels,
-      home_paths: proj.home_paths,
-      original_rels: [],
-      frontmatter: proj.frontmatter,
-    })
+      project: projectSkill,
+      project_archive: projectArchive,
+      global: globalSkill,
+      global_archive: globalArchive,
+      frontmatter:
+        projectSkill?.frontmatter
+        ?? globalSkill?.frontmatter
+        ?? projectArchive?.frontmatter
+        ?? globalArchive?.frontmatter
+        ?? null,
+    }))
   }
 
-  // Archived skills
-  for (const [id, arch] of archivedSkills) {
-    if (seen.has(id)) continue
-    const rels = arch.meta?.original_rels ?? []
-    // Read frontmatter from archive (dir: SKILL.md inside; flat: the .md file itself)
-    let archFrontmatter: SkillFrontmatter | null = null
-    try {
-      const { stat } = await import('node:fs/promises')
-      const s = await stat(arch.archive_path)
-      const skillMdPath = s.isDirectory() ? join(arch.archive_path, 'SKILL.md') : arch.archive_path
-      const text = await readFile(skillMdPath, 'utf8')
-      archFrontmatter = parseFrontmatter(text)
-    } catch { /* skip */ }
-    skills.push({
-      id,
-      name: id,
-      status: 'archived',
-      library_path: null,
-      library_checksum: null,
-      project_path: null,
-      project_checksum: null,
-      project_rel: null,
-      archive_path: arch.archive_path,
-      original_rel: rels[0] ?? null,
-      all_project_paths: [],
-      all_project_rels: [],
-      home_paths: [],
-      original_rels: rels,
-      frontmatter: archFrontmatter,
-    })
-  }
-
-  // ── Step 4: resolve primary skill dir and active skill rels ──────────────
-  const existingEntries = config.skill_dirs.filter(e => existsSync(join(projectPath, e.rel)))
+  const existingEntries = config.skill_dirs.filter(entry => existsSync(join(projectPath, entry.rel)))
   const primaryEntry = existingEntries[0] ?? config.skill_dirs[0]
   const primary_skill_rel = primaryEntry?.rel ?? '.claude/skills'
-  const active_skill_rels = existingEntries.map(e => e.rel)
+  const active_skill_rels = existingEntries.map(entry => entry.rel)
 
-  return { project_path: projectPath, project_name: projectName, skills, primary_skill_rel, active_skill_rels }
+  return {
+    project_path: projectPath,
+    project_name: projectName,
+    skills,
+    primary_skill_rel,
+    active_skill_rels,
+  }
 }

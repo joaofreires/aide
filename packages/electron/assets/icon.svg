@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="168" y1="120" x2="860" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#16243a"/>
+      <stop offset="0.54" stop-color="#0d1117"/>
+      <stop offset="1" stop-color="#09111c"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(498 404) rotate(66.5) scale(510 626)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7cc4ff" stop-opacity="0.24"/>
+      <stop offset="0.56" stop-color="#7cc4ff" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#7cc4ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="frame" x1="156" y1="132" x2="874" y2="884" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#86d0ff" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#30e1b3" stop-opacity="0.16"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="312" y1="230" x2="691" y2="808" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#eef8ff"/>
+      <stop offset="0.43" stop-color="#7fc7ff"/>
+      <stop offset="1" stop-color="#30e1b3"/>
+    </linearGradient>
+    <linearGradient id="nodes" x1="650" y1="297" x2="816" y2="721" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7cc4ff"/>
+      <stop offset="1" stop-color="#30e1b3"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="224" fill="url(#glow)"/>
+
+  <g opacity="0.92">
+    <rect x="112" y="112" width="800" height="800" rx="172" fill="none" stroke="url(#frame)" stroke-width="6"/>
+    <rect x="174" y="212" width="214" height="150" rx="38" fill="#101928" stroke="#21344f" stroke-width="4" transform="rotate(-8 281 287)"/>
+    <rect x="176" y="672" width="242" height="128" rx="34" fill="#101928" stroke="#1b314b" stroke-width="4" transform="rotate(7 297 736)"/>
+  </g>
+
+  <g opacity="0.94" stroke="url(#nodes)" stroke-linecap="round" stroke-width="18">
+    <path d="M626 406C671 390 694 373 736 333"/>
+    <path d="M646 576C692 576 700 546 736 512"/>
+    <path d="M628 674C676 694 695 710 736 720"/>
+  </g>
+
+  <path fill="url(#mark)" d="M512 172L796 820H670L602 662H422L354 820H228L512 172Z"/>
+  <path fill="#0d1117" d="M512 338L602 540H422L512 338Z"/>
+  <rect x="387" y="548" width="250" height="68" rx="34" fill="#e5f5ff"/>
+
+  <g>
+    <rect x="736" y="286" width="104" height="104" rx="28" fill="#132133" stroke="#7cc4ff" stroke-width="8"/>
+    <rect x="736" y="460" width="104" height="104" rx="28" fill="#14253a" stroke="#9cddff" stroke-width="8"/>
+    <rect x="736" y="634" width="104" height="104" rx="28" fill="#112231" stroke="#30e1b3" stroke-width="8"/>
+  </g>
+</svg>
