@@ -1,6 +1,6 @@
 {
   "name": "@aide/electron",
-  "version": "0.1.0",
+  "version": "0.0.2",
   "description": "Electron app for Aide - AI Mod Manager",
   "private": true,
   "main": "./dist/main.js",

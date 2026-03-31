@@ -18,8 +18,8 @@ function createWindow(): BrowserWindow {
 
   const indexPath = join(__dirname, 'renderer', 'index.html')
   void win.loadFile(indexPath)
-  win.webContents.once('did-finish-load', () => win.webContents.openDevTools())
   if (process.env['AIDE_DEVTOOLS']) {
+    win.webContents.once('did-finish-load', () => win.webContents.openDevTools())
   }
 
   return win
