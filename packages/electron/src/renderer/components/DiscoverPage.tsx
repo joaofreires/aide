@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { DiscoveredFile, RemoteSkill } from '@aide/core'
 import { useToast } from '../hooks/useToast.js'
 import { SkillDetail } from './shared/SkillDetail.js'
@@ -6,7 +6,7 @@ import { SkillDetail } from './shared/SkillDetail.js'
 type Tab = 'local' | 'repositories'
 
 export function DiscoverPage() {
-  const [tab, setTab] = useState<Tab>('local')
+  const [tab, setTab] = useState<Tab>('repositories')
 
   return (
     <div className="page active" style={{ display: 'flex' }}>
@@ -17,16 +17,16 @@ export function DiscoverPage() {
       <div className="page-content">
         <div style={{ display: 'flex', gap: '4px', marginBottom: '16px' }}>
           <button
-            className={`btn btn-sm${tab === 'local' ? ' btn-primary' : ' btn-secondary'}`}
-            onClick={() => setTab('local')}
-          >
-            Local
-          </button>
-          <button
             className={`btn btn-sm${tab === 'repositories' ? ' btn-primary' : ' btn-secondary'}`}
             onClick={() => setTab('repositories')}
           >
             Repositories
+          </button>
+          <button
+            className={`btn btn-sm${tab === 'local' ? ' btn-primary' : ' btn-secondary'}`}
+            onClick={() => setTab('local')}
+          >
+            Local
           </button>
         </div>
         {tab === 'local' ? <LocalTab /> : <RepositoriesTab />}
@@ -175,6 +175,10 @@ function RepositoriesTab() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
+
+  useEffect(()=>{
+    handleRefresh();
+  }, [])
 
   async function handleRefresh() {
     setLoading(true)

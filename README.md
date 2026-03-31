@@ -2,6 +2,9 @@
 
 My personal centralized manager for AI skills. Install, sync, and inject Skills, across development environments.
 
+![Project Preview](docs/assets/project-preview.png)
+
+
 ## Interfaces
 
 | Interface | Use case |
