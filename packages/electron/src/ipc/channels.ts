@@ -23,4 +23,11 @@ export const IPC = {
   LIST_REMOTE_SKILLS: 'aide:listRemoteSkills',
   ADD_REMOTE_SKILL: 'aide:addRemoteSkill',
   OPEN_EXTERNAL: 'aide:openExternal',
+
+  // Phase 4 additions
+  READ_MOD_CONTENT:          'aide:readModContent',
+  WRITE_MOD_CONTENT:         'aide:writeModContent',
+  LIST_MARKETPLACE_SKILLS:   'aide:listMarketplaceSkills',
+  LIST_SKILLSSH_PACKAGES:    'aide:listSkillsShPackages',
+  INSTALL_SKILLSSH_PACKAGE:  'aide:installSkillsShPackage',
 } as const

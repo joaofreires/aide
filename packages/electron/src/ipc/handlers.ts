@@ -1,4 +1,5 @@
 import { ipcMain, dialog, BrowserWindow, shell } from 'electron'
+import { readFile, writeFile } from 'node:fs/promises'
 import {
   init,
   add,
@@ -22,6 +23,9 @@ import {
   isAideDirInitialized,
   listRemoteSkills,
   addRemoteSkill,
+  listMarketplaceSkills,
+  fetchSkillsShCatalog,
+  installSkillsShPackage,
 } from '@aide/core'
 import type { GlobalConfig } from '@aide/core'
 import { IPC } from './channels.js'
@@ -116,8 +120,8 @@ export function registerIpcHandlers(): void {
     return isAideDirInitialized()
   })
 
-  ipcMain.handle(IPC.LIST_REMOTE_SKILLS, async () => {
-    return listRemoteSkills()
+  ipcMain.handle(IPC.LIST_REMOTE_SKILLS, async (_event, forceRefresh?: boolean) => {
+    return listRemoteSkills(forceRefresh)
   })
 
   ipcMain.handle(IPC.ADD_REMOTE_SKILL, async (_event, rawUrl: string, skillId: string, repo: string) => {
@@ -126,5 +130,29 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.OPEN_EXTERNAL, async (_event, url: string) => {
     await shell.openExternal(url)
+  })
+
+  // Phase 4: Template Editor
+  ipcMain.handle(IPC.READ_MOD_CONTENT, async (_event, filePath: string) => {
+    return readFile(filePath, 'utf8')
+  })
+
+  ipcMain.handle(IPC.WRITE_MOD_CONTENT, async (_event, filePath: string, content: string) => {
+    await writeFile(filePath, content, 'utf8')
+    return { success: true }
+  })
+
+  // Phase 4: Marketplace
+  ipcMain.handle(IPC.LIST_MARKETPLACE_SKILLS, async (_event, forceRefresh?: boolean) => {
+    return listMarketplaceSkills(forceRefresh)
+  })
+
+  // Phase 4: skills.sh
+  ipcMain.handle(IPC.LIST_SKILLSSH_PACKAGES, async (_event, forceRefresh?: boolean) => {
+    return fetchSkillsShCatalog(50, forceRefresh)
+  })
+
+  ipcMain.handle(IPC.INSTALL_SKILLSSH_PACKAGE, async (_event, downloadUrl: string, skillId: string) => {
+    return installSkillsShPackage(downloadUrl, skillId)
   })
 }

@@ -89,9 +89,18 @@ export type { EnableProjectSkillResult } from './operations/enableProjectSkill.j
 export type { ImportProjectSkillResult } from './operations/importProjectSkill.js'
 export type { CopyProjectSkillResult } from './operations/copyProjectSkillToRels.js'
 export type { RemoteSkill } from './operations/listRemoteSkills.js'
+export { listMarketplaceSkills } from './operations/listMarketplaceSkills.js'
+export type { MarketplaceSkill } from './operations/listMarketplaceSkills.js'
+export { fetchSkillsShCatalog, installSkillsShPackage } from './operations/fetchSkillsSh.js'
+export type { SkillsShPackage } from './operations/fetchSkillsSh.js'
 
 // Linking
 export { link, unlink } from './linking/linker.js'
 export { propagate } from './linking/propagator.js'
 export type { LinkOptions, LinkResult, UnlinkResult } from './linking/types.js'
 export type { PropagateOptions, PropagateResult } from './linking/propagator.js'
+
+// Cache
+export { readCache, writeCache, cacheAge } from './cache/diskCache.js'
+export type { CacheEntry } from './cache/diskCache.js'
+

@@ -8,8 +8,10 @@ import { DiscoverPage } from './components/DiscoverPage.js'
 import { ProjectsPage } from './components/ProjectsPage.js'
 import { ProjectDetailPage } from './components/ProjectDetailPage.js'
 import { SettingsPage } from './components/SettingsPage.js'
+import { TemplateEditorPage } from './components/TemplateEditorPage.js'
+import { ProjectMapPage } from './components/ProjectMapPage.js'
 
-export type Page = 'mods' | 'discover' | 'projects' | 'project-detail' | 'settings'
+export type Page = 'mods' | 'discover' | 'projects' | 'project-detail' | 'settings' | 'editor' | 'project-map'
 
 function InitPrompt({ onDone }: { onDone: () => void }) {
   const [loading, setLoading] = useState(false)
@@ -98,6 +100,7 @@ export function App() {
             <TopBar onLinkProject={() => { void handleLinkProject() }} />
             {page === 'mods' && <ModsPage />}
             {page === 'discover' && <DiscoverPage />}
+            {page === 'editor' && <TemplateEditorPage />}
             {page === 'projects' && (
               <ProjectsPage onOpenProject={path => navigate('project-detail', path)} />
             )}
@@ -107,6 +110,7 @@ export function App() {
                 onBack={() => navigate('projects')}
               />
             )}
+            {page === 'project-map' && <ProjectMapPage onNavigate={navigate} />}
             {page === 'settings' && <SettingsPage />}
           </div>
         </>

@@ -23,6 +23,8 @@ import type {
   CopyProjectSkillResult,
   SkillFrontmatter,
   RemoteSkill,
+  MarketplaceSkill,
+  SkillsShPackage,
 } from '@aide/core'
 
 type ConfigUpdates = Partial<Omit<GlobalConfig, 'version'>>
@@ -78,14 +80,32 @@ const aideAPI = {
   isInitialized: (): Promise<boolean> =>
     ipcRenderer.invoke(IPC.IS_INITIALIZED),
 
-  listRemoteSkills: (): Promise<RemoteSkill[]> =>
-    ipcRenderer.invoke(IPC.LIST_REMOTE_SKILLS),
+  listRemoteSkills: (forceRefresh?: boolean): Promise<RemoteSkill[]> =>
+    ipcRenderer.invoke(IPC.LIST_REMOTE_SKILLS, forceRefresh),
 
-  addRemoteSkill: (rawUrl: string, skillId: string, repo: string): Promise<AddResult> =>
-    ipcRenderer.invoke(IPC.ADD_REMOTE_SKILL, rawUrl, skillId, repo),
+  addRemoteSkill: (downloadUrl: string, skillId: string, repoSlug: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC.ADD_REMOTE_SKILL, downloadUrl, skillId, repoSlug),
 
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url),
+
+  // Phase 4: Template Editor
+  readModContent: (filePath: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.READ_MOD_CONTENT, filePath),
+
+  writeModContent: (filePath: string, content: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC.WRITE_MOD_CONTENT, filePath, content),
+
+  // Phase 4: Marketplace
+  listMarketplaceSkills: (forceRefresh?: boolean): Promise<MarketplaceSkill[]> =>
+    ipcRenderer.invoke(IPC.LIST_MARKETPLACE_SKILLS, forceRefresh),
+
+  // Phase 4: skills.sh
+  listSkillsShPackages: (forceRefresh?: boolean): Promise<SkillsShPackage[]> =>
+    ipcRenderer.invoke(IPC.LIST_SKILLSSH_PACKAGES, forceRefresh),
+
+  installSkillsShPackage: (downloadUrl: string, skillId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC.INSTALL_SKILLSSH_PACKAGE, downloadUrl, skillId),
 }
 
 contextBridge.exposeInMainWorld('aide', aideAPI)

@@ -318,7 +318,7 @@ export function ProjectDetailPage({ projectPath, onBack }: ProjectDetailPageProp
         <button className="btn btn-secondary btn-sm" onClick={onBack}>← Back</button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="page-title">{projectName}</div>
-          <div className="page-desc">{projectPath}</div>
+          {/* <div className="page-desc">{projectPath}</div> */}
         </div>
         <button className="btn btn-secondary btn-sm" onClick={() => { void load() }}>
           Refresh

@@ -18,10 +18,26 @@ interface GitHubEntry {
   type: string
 }
 
-export async function listRemoteSkills(homeOverride?: string): Promise<RemoteSkill[]> {
+export async function listRemoteSkills(
+  forceRefresh: boolean = false,
+  homeOverride?: string
+): Promise<RemoteSkill[]> {
+  const { readCache, writeCache } = await import('../cache/diskCache.js')
+  const CACHE_KEY = 'remote_skills_catalog'
+
   const config = await readConfig(homeOverride)
   const registry = await readRegistry(homeOverride)
   const installedIds = new Set(Object.values(registry.mods).map(m => m.id))
+
+  if (!forceRefresh) {
+    const cached = await readCache<RemoteSkill[]>(CACHE_KEY, homeOverride)
+    if (cached) {
+      return cached.data.map(pkg => ({
+        ...pkg,
+        already_installed: installedIds.has(pkg.id)
+      }))
+    }
+  }
 
   const results: RemoteSkill[] = []
 
@@ -69,5 +85,6 @@ export async function listRemoteSkills(homeOverride?: string): Promise<RemoteSki
     }
   }
 
+  await writeCache(CACHE_KEY, results, homeOverride)
   return results
 }

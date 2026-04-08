@@ -31,12 +31,24 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         >
           <span className="nav-icon">🔍</span> Discover
         </button>
+        <button
+          className={`nav-btn${activePage === 'editor' ? ' active' : ''}`}
+          onClick={() => onNavigate('editor')}
+        >
+          <span className="nav-icon">📝</span> Editor
+        </button>
         <div className="nav-section">Workspace</div>
         <button
-          className={`nav-btn${activePage === 'projects' ? ' active' : ''}`}
+          className={`nav-btn${activePage === 'projects' || activePage === 'project-detail' ? ' active' : ''}`}
           onClick={() => onNavigate('projects')}
         >
           <span className="nav-icon">🔗</span> Projects
+        </button>
+        <button
+          className={`nav-btn${activePage === 'project-map' ? ' active' : ''}`}
+          onClick={() => onNavigate('project-map')}
+        >
+          <span className="nav-icon">🗺️</span> Project Map
         </button>
         <button
           className={`nav-btn${activePage === 'settings' ? ' active' : ''}`}

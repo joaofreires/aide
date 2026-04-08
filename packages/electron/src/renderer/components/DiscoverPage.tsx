@@ -1,40 +1,50 @@
 import { useEffect, useState } from 'react'
-import type { DiscoveredFile, RemoteSkill } from '@aide/core'
+import type { DiscoveredFile, RemoteSkill, MarketplaceSkill, SkillsShPackage } from '@aide/core'
 import { useToast } from '../hooks/useToast.js'
 import { SkillDetail } from './shared/SkillDetail.js'
 
-type Tab = 'local' | 'repositories'
+type Tab = 'repositories' | 'marketplace' | 'skillssh' | 'local'
 
 export function DiscoverPage() {
   const [tab, setTab] = useState<Tab>('repositories')
+
+  const tabs: { key: Tab; label: string; icon: string }[] = [
+    { key: 'repositories', label: 'Repositories', icon: '📦' },
+    { key: 'marketplace', label: 'Marketplace', icon: '🏪' },
+    { key: 'skillssh', label: 'skills.sh', icon: '⚡' },
+    { key: 'local', label: 'Local', icon: '💾' },
+  ]
 
   return (
     <div className="page active" style={{ display: 'flex' }}>
       <div className="page-header">
         <div className="page-title">Discover</div>
-        <div className="page-desc">Find and install AI skills from your filesystem or GitHub repositories</div>
+        <div className="page-desc">Find and install AI skills from multiple sources</div>
       </div>
       <div className="page-content">
         <div style={{ display: 'flex', gap: '4px', marginBottom: '16px' }}>
-          <button
-            className={`btn btn-sm${tab === 'repositories' ? ' btn-primary' : ' btn-secondary'}`}
-            onClick={() => setTab('repositories')}
-          >
-            Repositories
-          </button>
-          <button
-            className={`btn btn-sm${tab === 'local' ? ' btn-primary' : ' btn-secondary'}`}
-            onClick={() => setTab('local')}
-          >
-            Local
-          </button>
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              className={`btn btn-sm${tab === t.key ? ' btn-primary' : ' btn-secondary'}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.icon} {t.label}
+            </button>
+          ))}
         </div>
-        {tab === 'local' ? <LocalTab /> : <RepositoriesTab />}
+        {tab === 'repositories' && <RepositoriesTab />}
+        {tab === 'marketplace' && <MarketplaceTab />}
+        {tab === 'skillssh' && <SkillsShTab />}
+        {tab === 'local' && <LocalTab />}
       </div>
     </div>
   )
 }
 
+/* ═══════════════════════════════════════════════
+   LOCAL TAB (unchanged from original)
+   ═══════════════════════════════════════════════ */
 function LocalTab() {
   const { toast } = useToast()
   const [scanResults, setScanResults] = useState<DiscoveredFile[]>([])
@@ -167,6 +177,9 @@ function LocalTab() {
   )
 }
 
+/* ═══════════════════════════════════════════════
+   REPOSITORIES TAB (unchanged from original)
+   ═══════════════════════════════════════════════ */
 function RepositoriesTab() {
   const { toast } = useToast()
   const [skills, setSkills] = useState<RemoteSkill[]>([])
@@ -180,11 +193,11 @@ function RepositoriesTab() {
     handleRefresh();
   }, [])
 
-  async function handleRefresh() {
+  async function handleRefresh(forceRefresh = false) {
     setLoading(true)
     setError(null)
     try {
-      const result = await window.aide.listRemoteSkills()
+      const result = await window.aide.listRemoteSkills(forceRefresh)
       setSkills(result)
       setLoaded(true)
     } catch (err) {
@@ -234,9 +247,9 @@ function RepositoriesTab() {
           <button
             className="btn btn-primary btn-sm"
             disabled={loading}
-            onClick={() => { void handleRefresh() }}
+            onClick={() => { void handleRefresh(true) }}
           >
-            {loading ? 'Loading...' : loaded ? 'Refresh' : 'Load Skills'}
+            {loading ? 'Loading...' : loaded ? 'Force Refresh' : 'Load Skills'}
           </button>
         </div>
         <div className="list-body">
@@ -306,3 +319,293 @@ function RepositoriesTab() {
     </>
   )
 }
+
+/* ═══════════════════════════════════════════════
+   MARKETPLACE TAB (NEW)
+   ═══════════════════════════════════════════════ */
+function MarketplaceTab() {
+  const { toast } = useToast()
+  const [skills, setSkills] = useState<MarketplaceSkill[]>([])
+  const [loading, setLoading] = useState(false)
+  const [installing, setInstalling] = useState<Set<string>>(new Set())
+  const [error, setError] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [search, setSearch] = useState('')
+
+  async function handleLoad(forceRefresh = false) {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await window.aide.listMarketplaceSkills(forceRefresh)
+      setSkills(result)
+      setLoaded(true)
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void handleLoad() }, [])
+
+  async function handleInstall(skill: MarketplaceSkill) {
+    setInstalling(prev => new Set(prev).add(skill.id))
+    try {
+      await window.aide.addRemoteSkill(skill.download_url, skill.id, 'marketplace')
+      toast(`Installed "${skill.name}"`, 'success')
+      setSkills(prev => prev.map(s => s.id === skill.id ? { ...s, already_installed: true } : s))
+    } catch (err) {
+      toast(`Error: ${err}`, 'error')
+    } finally {
+      setInstalling(prev => {
+        const next = new Set(prev)
+        next.delete(skill.id)
+        return next
+      })
+    }
+  }
+
+  const filtered = skills.filter(s => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return s.name.toLowerCase().includes(q) ||
+      s.description.toLowerCase().includes(q) ||
+      s.tags.some(t => t.toLowerCase().includes(q))
+  })
+
+  if (!loaded && !loading && !error) {
+    return (
+      <div className="empty">
+        <span className="empty-icon">🏪</span>
+        <br />
+        Configure a <strong>Registry URL</strong> in Settings → General to browse community skills.
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {loaded && skills.length > 0 && (
+        <div className="marketplace-search">
+          <input
+            type="text"
+            placeholder="Search skills by name, description, or tags…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <button
+            className="btn btn-secondary btn-sm"
+            disabled={loading}
+            onClick={() => { void handleLoad(true) }}
+          >
+            Force Refresh
+          </button>
+        </div>
+      )}
+
+      {loading && (
+        <div className="empty"><span className="empty-icon">⏳</span>Loading marketplace…</div>
+      )}
+
+      {!loading && loaded && (
+        <div className="marketplace-grid">
+          {filtered.length === 0 ? (
+            <div className="marketplace-empty">
+              <span className="empty-icon">🔍</span>
+              {search ? 'No skills match your search.' : 'No skills available.'}
+            </div>
+          ) : (
+            filtered.map(skill => (
+              <div key={skill.id} className="marketplace-card">
+                <div className="marketplace-card-header">
+                  <span className="marketplace-card-name">{skill.name}</span>
+                  <span className="marketplace-card-version">v{skill.version}</span>
+                </div>
+                <div className="marketplace-card-desc">{skill.description || 'No description'}</div>
+                {skill.tags.length > 0 && (
+                  <div className="marketplace-card-tags">
+                    {skill.tags.map(tag => (
+                      <span key={tag} className="marketplace-card-tag">{tag}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="marketplace-card-footer">
+                  <span className="marketplace-card-author">by {skill.author}</span>
+                  {skill.already_installed ? (
+                    <span className="pill">Installed</span>
+                  ) : (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      disabled={installing.has(skill.id)}
+                      onClick={() => { void handleInstall(skill) }}
+                    >
+                      {installing.has(skill.id) ? 'Installing…' : 'Install'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {error && <div className="feedback show-error">{error}</div>}
+    </>
+  )
+}
+
+/* ═══════════════════════════════════════════════
+   SKILLS.SH TAB (LIVE)
+   ═══════════════════════════════════════════════ */
+function SkillsShTab() {
+  const { toast } = useToast()
+  const [packages, setPackages] = useState<SkillsShPackage[]>([])
+  const [loading, setLoading] = useState(false)
+  const [installing, setInstalling] = useState<Set<string>>(new Set())
+  const [error, setError] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [search, setSearch] = useState('')
+
+  async function handleLoad(forceRefresh = false) {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await window.aide.listSkillsShPackages(forceRefresh)
+      setPackages(result)
+      setLoaded(true)
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void handleLoad() }, [])
+
+  async function handleInstall(pkg: SkillsShPackage) {
+    setInstalling(prev => new Set(prev).add(pkg.id))
+    try {
+      const result = await window.aide.installSkillsShPackage(pkg.rawUrl, pkg.id)
+      if (result.success) {
+        toast(`Installed "${pkg.name}" from skills.sh`, 'success')
+        setPackages(prev => prev.map(p => p.id === pkg.id ? { ...p, already_installed: true } : p))
+      } else {
+        toast(`Error: ${result.error}`, 'error')
+      }
+    } catch (err) {
+      toast(`Error: ${err}`, 'error')
+    } finally {
+      setInstalling(prev => {
+        const next = new Set(prev)
+        next.delete(pkg.id)
+        return next
+      })
+    }
+  }
+
+  const filtered = packages.filter(p => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return p.name.toLowerCase().includes(q) ||
+      p.description.toLowerCase().includes(q) ||
+      p.owner.toLowerCase().includes(q) ||
+      p.repo.toLowerCase().includes(q)
+  })
+
+  return (
+    <>
+      <div className="skillssh-banner">
+        <span className="skillssh-banner-icon">⚡</span>
+        <div className="skillssh-banner-text">
+          <div className="skillssh-banner-title">skills.sh Integration</div>
+          <div className="skillssh-banner-desc">
+            Browse and install skills from the <a href="https://skills.sh" style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={e => { e.preventDefault(); void window.aide.openExternal('https://skills.sh') }}>skills.sh</a> ecosystem.
+            Aide downloads them from GitHub and manages them in your <code style={{ color: 'var(--accent)' }}>~/.aide/</code> directory.
+          </div>
+        </div>
+        <button
+          className="btn btn-primary btn-sm"
+          disabled={loading}
+          onClick={() => { void handleLoad(loaded) }}
+        >
+          {loading ? 'Loading…' : loaded ? 'Force Refresh' : 'Load Catalog'}
+        </button>
+      </div>
+
+      {loaded && packages.length > 0 && (
+        <div className="marketplace-search">
+          <input
+            type="text"
+            placeholder="Search skills.sh by name, owner, or repo…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+      )}
+
+      {loading && (
+        <div className="empty"><span className="empty-icon">⏳</span>Fetching skills.sh catalog (this may take a moment)…</div>
+      )}
+
+      {!loading && loaded && (
+        <div className="marketplace-grid">
+          {filtered.length === 0 ? (
+            <div className="marketplace-empty">
+              <span className="empty-icon">⚡</span>
+              {packages.length === 0
+                ? 'Could not load skills from skills.sh. Check your internet connection.'
+                : 'No packages match your search.'}
+            </div>
+          ) : (
+            filtered.map(pkg => (
+              <div key={`${pkg.owner}/${pkg.repo}/${pkg.id}`} className="marketplace-card">
+                <div className="marketplace-card-header">
+                  <span className="marketplace-card-name">{pkg.name}</span>
+                  {pkg.installs !== '0' && (
+                    <span className="marketplace-card-version">{pkg.installs} installs</span>
+                  )}
+                </div>
+                <div className="marketplace-card-desc">{pkg.description || 'No description available'}</div>
+                <div className="marketplace-card-tags">
+                  <span className="marketplace-card-tag">{pkg.owner}/{pkg.repo}</span>
+                </div>
+                <div className="marketplace-card-footer">
+                  <span className="marketplace-card-author">
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '2px 8px', fontSize: '11px' }}
+                      onClick={() => { void window.aide.openExternal(pkg.homepageUrl) }}
+                    >
+                      skills.sh ↗
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ marginLeft: '4px', padding: '2px 8px', fontSize: '11px' }}
+                      onClick={() => { void window.aide.openExternal(pkg.pageUrl) }}
+                    >
+                      GitHub ↗
+                    </button>
+                  </span>
+                  {pkg.already_installed ? (
+                    <span className="pill">Installed</span>
+                  ) : (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      disabled={installing.has(pkg.id)}
+                      onClick={() => { void handleInstall(pkg) }}
+                    >
+                      {installing.has(pkg.id) ? 'Installing…' : 'Install'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {error && <div className="feedback show-error">{error}</div>}
+    </>
+  )
+}
+
